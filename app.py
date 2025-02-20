@@ -31,10 +31,7 @@ def query():
             query=message,
             temperature=0.1,
             lastk=0,
-            session_id='GenericSession',
-            rag_usage=True,
-            rag_threshold='0.3',
-            rag_k=1
+            session_id='GenericSession'
         )
 
         response_text = response.get('response', '')
