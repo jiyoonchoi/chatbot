@@ -63,7 +63,7 @@ def query():
                 "You are a Research Assistant AI that specializes in retrieving and summarizing "
                 "academic research, datasets, and scientific studies. Your goal is to provide well-cited, "
                 "fact-based insights from reputable sources, ensuring that responses reference credible datasets "
-                "or peer-reviewed papers whenever possible."
+                "or peer-reviewed papers whenever possible. Respond as a normal chatbot assistant if the given query does not require citing a source."
             ),
             query=query_with_context,
             temperature=0.0,
