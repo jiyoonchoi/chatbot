@@ -1,38 +1,61 @@
 import os
 from flask import Flask, request, jsonify
 from llmproxy import generate
+import requests
 
 app = Flask(__name__)
 
-@app.route('/')
-def hello_world():
-    return jsonify({"text": 'Hello from Koyeb - you reached the main page!'})
+API_KEY = os.environ.get("googleApiKey")
+CSE_ID = os.environ.get("googleSearchId")
+
+def google_search(query):
+    """
+    Performs a Google Custom Search and returns the top 3 results.
+    """
+    url = "https://www.googleapis.com/customsearch/v1"
+    params = {
+        'q': query,
+        'key': API_KEY,
+        'cx': CSE_ID,
+        'num': 3  # Limit results to avoid too much data
+    }
+    response = requests.get(url, params=params)
+    
+    if response.status_code != 200:
+        print(f"Google Search API Error: {response.status_code}, {response.text}")
+        return []
+    
+    results = response.json().get("items", [])
+    return [item.get("snippet", "") for item in results]  # Extract snippets
 
 @app.route('/query', methods=['POST'])
 def query():
-    # Extract data from the query
     data = request.get_json()
     user = data.get("user_name", "Unknown")
     message = data.get("text", "")
 
-    # Ignore bot messages or empty text
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
     try:
-        # Generate the response from the model, now without Google Search response
+        # Step 1: Fetch data from Google Search API
+        search_results = google_search(message)
+        search_info = "\n".join(search_results) if search_results else "No relevant search results found."
+
+        # Step 2: Generate response with Google Search results
+        query_with_context = f"User query: {message}\n\nRelevant information from Google Search:\n{search_info}"
+        
         response = generate(
             model='4o-mini',
             system=(
-                "You are a Personal Finance Assistant bot. Your role is to help individuals "
-                "with financial matters such as tracking expenses, budgeting, setting savings goals, "
-                "suggesting investment options, and answering questions related to taxes, loans, and more. "
-                "Please do not greet users automatically. Answer based on the provided information or general financial principles."
+                "You are a Personal Finance Assistant bot. Your role is to provide financial guidance, "
+                "budgeting strategies, investment options, and savings tips based on user queries. "
+                "Use external information when available. If financial data is lacking, rely on general financial principles."
             ),
-            query=message,
+            query=query_with_context,
             temperature=0.1,
             lastk=0,
-            session_id='GenericSession'
+            session_id='FinanceBotSession'
         )
 
         response_text = response.get('response', '')
