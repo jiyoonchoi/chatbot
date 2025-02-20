@@ -6,17 +6,20 @@ app = Flask(__name__)
 
 # Function to perform a search using Google's Custom Search API
 def google_search(query):
-    api_key = 'AIzaSyDKNUeIRdGOIacjk--fNa2vcs00WHtqHIM'  # Your Google API key
-    cse_id = '945654d55c45d4da4'  # Your Custom Search Engine ID
-    url = f"https://www.googleapis.com/customsearch/v1?q={query}&key={api_key}&cx={cse_id}"
+    api_key = 'AIzaSyDKNUeIRdGOIacjk--fNa2vcs00WHtqHIM'
+    cse_id = '945654d55c45d4da4'
+    websites = ['https://wagnerhigh.net/ourpages/auto/2013/2/13/48465391/Personal%20Finance%20for%20Dummies.pdf', 'https://www.nerdwallet.com/', 'https://www.reddit.com/r/personalfinance/']
+    site_query = " OR ".join([f"site:{website}" for website in websites])
+    search_query = f"{site_query} {query}"
+    
+    url = f"https://www.googleapis.com/customsearch/v1?q={search_query}&key={api_key}&cx={cse_id}"
 
     try:
         response = requests.get(url)
-        response.raise_for_status()  # Raise an error for bad HTTP status codes
+        response.raise_for_status()
         results = response.json()
 
         if 'items' in results:
-            # Extract the first result's snippet and link as relevant information
             first_result = results['items'][0]
             return first_result['snippet'], first_result['link']
         else:
@@ -25,6 +28,7 @@ def google_search(query):
     except requests.exceptions.RequestException as e:
         print(f"Error with Google Custom Search API: {e}")
         return "Sorry, there was an error with the search. Please try again later.", ""
+
 
 @app.route('/')
 def hello_world():
