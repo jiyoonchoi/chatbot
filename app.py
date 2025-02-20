@@ -1,4 +1,5 @@
 import os
+import threading
 from flask import Flask, request, jsonify
 from llmproxy import generate, pdf_upload
 import time
@@ -10,9 +11,8 @@ pdf_file_path = 'Personal Finance for Dummies.pdf'
 processed = False
 pdf_processing_complete = False
 
-# Process the PDF when the server starts
-@app.before_first_request
-def process_pdf():
+# Function to process the PDF in a background thread
+def process_pdf_async():
     global processed, pdf_processing_complete
 
     if os.path.exists(pdf_file_path):
@@ -25,17 +25,21 @@ def process_pdf():
             processed = True
             print("PDF processing started:", response)
 
-            # Wait for the PDF to be added to the context (this may require adjusting based on the actual system's behavior)
-            while not pdf_processing_complete:
-                # Simulate checking if the document is fully processed. Adjust based on actual processing behavior.
-                time.sleep(5)  # wait for the processing to complete
-                print("Waiting for PDF to be fully processed...")
+            # Simulate checking if the document is fully processed (adjust based on actual behavior)
+            time.sleep(10)  # Adjust sleep time to reflect actual processing time
+            pdf_processing_complete = True
 
             print("PDF processed successfully.")
         except Exception as e:
             print(f"Error processing PDF: {e}")
     else:
         print("PDF file not found at:", pdf_file_path)
+
+# Process the PDF when the server starts in a background thread
+@app.before_first_request
+def before_first_request():
+    # Start PDF processing asynchronously
+    threading.Thread(target=process_pdf_async, daemon=True).start()
 
 @app.route('/')
 def hello_world():
@@ -46,7 +50,7 @@ def query():
     # Ensure the PDF is processed before accepting queries
     if not processed:
         return jsonify({"error": "The system is still processing the PDF. Please try again later."}), 503
-    
+
     if not pdf_processing_complete:
         return jsonify({"error": "The PDF is still being processed. Please try again later."}), 503
 
