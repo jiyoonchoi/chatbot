@@ -1,4 +1,4 @@
-import requests
+import requests, os
 from flask import Flask, request, jsonify
 from llmproxy import generate
 
@@ -6,8 +6,8 @@ app = Flask(__name__)
 
 # Function to perform a search using Google's Custom Search API
 def google_search(query):
-    api_key = 'AIzaSyDKNUeIRdGOIacjk--fNa2vcs00WHtqHIM'
-    cse_id = '945654d55c45d4da4'
+    api_key = os.getenv('GOOGLE_API_KEY')
+    cse_id = os.getenv('CSE_ID')
     websites = ['https://wagnerhigh.net/ourpages/auto/2013/2/13/48465391/Personal%20Finance%20for%20Dummies.pdf', 'https://www.nerdwallet.com/', 'https://www.reddit.com/r/personalfinance/']
     site_query = " OR ".join([f"site:{website}" for website in websites])
     search_query = f"{site_query} {query}"
