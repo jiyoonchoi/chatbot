@@ -4,9 +4,9 @@ from llmproxy import generate, pdf_upload
 
 app = Flask(__name__)
 
-# Set the file path for the PDF you want to provide directly
-pdf_file_path = 'IfYouCan.pdf'
-processed = False  # Flag to track whether the PDF has been processed
+# Set the file path for the PDF directly
+pdf_file_path = 'Personal Finance for Dummies.pdf'
+processed = False
 
 # Process the PDF when the server starts
 @app.before_first_request
