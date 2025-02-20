@@ -5,7 +5,7 @@ from llmproxy import generate, pdf_upload
 app = Flask(__name__)
 
 # Set the file path for the PDF you want to provide directly
-pdf_file_path = '/Users/jiyoon/LLMProxy/WebServer/IfYouCan.pdf'
+pdf_file_path = 'IfYouCan.pdf'
 processed = False  # Flag to track whether the PDF has been processed
 
 # Process the PDF when the server starts
@@ -13,8 +13,6 @@ processed = False  # Flag to track whether the PDF has been processed
 def process_pdf():
     global processed
 
-    print("Absolute PDF Path:", os.path.abspath(pdf_file_path))
-    
     if os.path.exists(pdf_file_path):
         response = pdf_upload(
             path=pdf_file_path,
