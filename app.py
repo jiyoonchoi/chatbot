@@ -94,4 +94,4 @@ def page_not_found(e):
     return "Not Found", 404
 
 if __name__ == "__main__":
-    app.run(
+    app.run()
