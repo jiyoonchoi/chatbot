@@ -14,13 +14,16 @@ def process_pdf():
     global processed
 
     if os.path.exists(pdf_file_path):
-        response = pdf_upload(
-            path=pdf_file_path,
-            session_id='GenericSession',
-            strategy='smart'
-        )
-        processed = True 
-        print("PDF processed successfully:", response)
+        try:
+            response = pdf_upload(
+                path=pdf_file_path,
+                session_id='GenericSession',
+                strategy='smart'
+            )
+            processed = True
+            print("PDF processed successfully:", response)
+        except Exception as e:
+            print(f"Error processing PDF: {e}")
     else:
         print("PDF file not found at:", pdf_file_path)
 
