@@ -43,7 +43,8 @@ def google_search(query):
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
-    user = data.get("user_name", "Unknown")
+    user_id = data.get("user_id", "unknown_user")
+    session_id = data.get("session_id", f"session_{user_id}")
     message = data.get("text", "")
 
     if data.get("bot") or not message:
@@ -68,7 +69,7 @@ def query():
             query=query_with_context,
             temperature=0.0,
             lastk=0,
-            session_id='ResearchAssistantSession'
+            session_id=session_id  # Ensure responses are linked to a unique session
         )
 
         response_text = response.get('response', "").strip()
@@ -83,7 +84,7 @@ def query():
 
         final_response = "\n\n".join(response_parts) if response_parts else "I'm unable to find relevant research at the moment."
 
-        return jsonify({"text": final_response})
+        return jsonify({"text": final_response, "session_id": session_id})
 
     except Exception as e:
         print(f"Error generating response: {e}")
