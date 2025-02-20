@@ -55,16 +55,15 @@ def query():
             "You are a Personal Finance Assistant bot. Your role is to help individuals "
             "with financial matters such as tracking expenses, budgeting, setting savings goals, "
             "suggesting investment options, and answering questions related to taxes, loans, and more. "
-            "You use financial literacy books as your reference. "
-            "Please provide answers based on the information from the uploaded PDF or general financial principles."
+            "Please do not greet users automatically. Answer based on the information from the uploaded PDF or general financial principles."
         ),
         query=message,
-        temperature=0.0,
+        temperature=0.1,
         lastk=0,
         session_id='GenericSession',
-        rag_usage=True,         # Enable RAG
-        rag_threshold='0.3',    # Set threshold for relevance of retrieved data
-        rag_k=1                 # Retrieve top k most relevant passages
+        rag_usage=True,         
+        rag_threshold='0.3',
+        rag_k=3
     )
 
     response_text = response['response']
