@@ -1,5 +1,4 @@
 import os
-import threading
 from flask import Flask, request, jsonify
 from llmproxy import generate, pdf_upload
 import time
@@ -11,12 +10,13 @@ pdf_file_path = 'Personal Finance for Dummies.pdf'
 processed = False
 pdf_processing_complete = False
 
-# Function to process the PDF in a background thread
-def process_pdf_async():
+# Function to process the PDF
+def process_pdf():
     global processed, pdf_processing_complete
 
     if os.path.exists(pdf_file_path):
         try:
+            # Call your PDF upload function to process it
             response = pdf_upload(
                 path=pdf_file_path,
                 session_id='GenericSession',
@@ -35,11 +35,10 @@ def process_pdf_async():
     else:
         print("PDF file not found at:", pdf_file_path)
 
-# Process the PDF when the server starts in a background thread
 @app.before_first_request
 def before_first_request():
-    # Start PDF processing asynchronously
-    threading.Thread(target=process_pdf_async, daemon=True).start()
+    # Start the PDF processing synchronously before the first request
+    process_pdf()
 
 @app.route('/')
 def hello_world():
@@ -80,9 +79,9 @@ def query():
             temperature=0.1,
             lastk=0,
             session_id='GenericSession',
-            rag_usage=True,         
+            rag_usage=True,
             rag_threshold='0.3',
-            rag_k=3
+            rag_k=1
         )
 
         response_text = response.get('response', '')
@@ -95,7 +94,6 @@ def query():
     except Exception as e:
         print(f"Error generating response: {e}")
         return jsonify({"error": "An error occurred while processing your request. Please try again later."}), 500
-
 
 @app.errorhandler(404)
 def page_not_found(e):
