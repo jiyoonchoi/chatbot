@@ -121,17 +121,22 @@ def main():
     """
     data = request.get_json()  
     user = data.get("user_name", "Unknown")
-    message = data.get("text", "")
+    message = data.get("text", "").strip()  # Ensure no empty queries
 
     print(data)
 
     # Ignore bot messages or empty input
     if data.get("bot") or not message:
-        return jsonify({"status": "ignored"})
+        return jsonify({"text": "It seems like your message was empty. Please provide a topic or question!"})
 
     print(f"Message from {user}: {message}")
 
+    # Search for relevant datasets and sources
     search_summary = google_search(message)
+
+    # Ensure a valid search response
+    if not search_summary.strip():
+        return jsonify({"text": "I couldn't find relevant research sources. Try rewording your query!"})
 
     # Generate a research-oriented response
     response = generate(
@@ -155,6 +160,7 @@ def main():
     print(final_response)
 
     return jsonify({"text": final_response})
+
 
 @app.errorhandler(404)
 def page_not_found(e):
