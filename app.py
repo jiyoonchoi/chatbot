@@ -47,28 +47,26 @@ def hello_world():
 
 @app.route('/query', methods=['POST'])
 def query():
+    global processed, pdf_processing_complete
+
     # Ensure the PDF is processed before accepting queries
     if not processed:
         return jsonify({"error": "The system is still processing the PDF. Please try again later."}), 503
 
+    # Check if PDF processing is fully complete
     if not pdf_processing_complete:
         return jsonify({"error": "The PDF is still being processed. Please try again later."}), 503
 
+    # Extract data from the query
     data = request.get_json()
-
-    # Extract relevant information from the request
     user = data.get("user_name", "Unknown")
     message = data.get("text", "")
 
-    print(data)
-
-    # Ignore bot messages or if no message is provided
+    # Ignore bot messages or empty text
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
-    print(f"Message from {user}: {message}")
-
-    # Instruct the bot to respond as a Personal Finance Assistant and enable RAG
+    # Generate the response from the model
     try:
         response = generate(
             model='4o-mini',
@@ -92,12 +90,12 @@ def query():
             print("Warning: No response text generated.")
             response_text = "Sorry, I couldn't generate a helpful response at the moment."
 
-        print(f"Response from bot: {response_text}")
         return jsonify({"text": response_text})
 
     except Exception as e:
         print(f"Error generating response: {e}")
         return jsonify({"error": "An error occurred while processing your request. Please try again later."}), 500
+
 
 @app.errorhandler(404)
 def page_not_found(e):
