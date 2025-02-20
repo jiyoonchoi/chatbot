@@ -12,6 +12,9 @@ processed = False  # Flag to track whether the PDF has been processed
 @app.before_first_request
 def process_pdf():
     global processed
+
+    print("Absolute PDF Path:", os.path.abspath(pdf_file_path))
+    
     if os.path.exists(pdf_file_path):
         response = pdf_upload(
             path=pdf_file_path,
