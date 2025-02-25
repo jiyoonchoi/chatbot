@@ -147,18 +147,23 @@ def query():
     data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
 
+    # Check if this is a summarization action.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
             print("DEBUG: No paper link provided in request")
             return jsonify({"error": "No paper link provided"}), 400
 
+        print(f"DEBUG: Summarize action requested for link: {paper_link}")
         print("DEBUG: Summarization process started...")
+
+        # Fetch the paper's text (from HTML and/or linked PDF).
         paper_text = fetch_paper_text(paper_link)
         if not paper_text or len(paper_text.strip()) == 0:
             print("DEBUG: Could not retrieve paper content")
             return jsonify({"error": "Could not retrieve paper content"}), 400
 
+        # Limit the text for summarization to avoid huge prompts.
         excerpt = paper_text[:3000]
         print(f"DEBUG: Excerpt for summarization (first 3000 chars): {excerpt[:200]}...")
         summary_prompt = (
@@ -179,6 +184,7 @@ def query():
             summary_text = summary_response.strip()
         print(f"DEBUG: Received summary text: {summary_text[:300]}...")
 
+        # Create a PDF file from the summary.
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
