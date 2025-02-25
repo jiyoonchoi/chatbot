@@ -18,6 +18,30 @@ CSE_ID = os.environ.get("googleSearchId")
 # Global store for conversation history (keyed by session_id).
 conversation_history = {}
 
+def classify_query(message):
+    """
+    Uses an LLM agent to classify the query.
+    The LLM should return one word: 'greeting', 'research', or 'other'.
+    """
+    prompt = (
+        f"Determine if the following message is a greeting, a research query, or something else. "
+        f"Reply with just one word: 'greeting' if it's a simple greeting, 'research' if it's asking for research-related information, or 'other' if it is unrelated to research. "
+        f"Message: \"{message}\""
+    )
+    classification = generate(
+        model='4o-mini',
+        system="You are a query classifier. Classify the user message as 'greeting', 'research', or 'other'.",
+        query=prompt,
+        temperature=0.0,
+        lastk=0,
+        session_id="classify_" + str(uuid.uuid4())
+    )
+    if isinstance(classification, dict):
+        classification_text = classification.get('response', '').strip().lower()
+    else:
+        classification_text = classification.strip().lower()
+    return classification_text
+
 def google_search(query, num_results=3):
     """
     Performs a Google Custom Search focused on research papers and datasets.
@@ -54,21 +78,6 @@ def google_search(query, num_results=3):
         )
     return search_summaries
 
-def is_research_query(message):
-    """
-    Checks if the message contains research-related keywords.
-    """
-    keywords = ['paper', 'research', 'study', 'dataset', 'data', 'journal', 'article']
-    return any(word in message.lower() for word in keywords)
-
-def is_greeting_query(message):
-    """
-    Returns True if the message is a simple greeting.
-    """
-    greetings = ['hi', 'hello', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening']
-    msg_lower = message.strip().lower()
-    return any(msg_lower == greeting for greeting in greetings)
-
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
@@ -79,7 +88,6 @@ def query():
         if not paper_link:
             return jsonify({"error": "No paper link provided"}), 400
 
-        # Prepare the summarization prompt.
         summary_prompt = f"Please provide a concise summary of the paper available at: {paper_link}"
         summary_response = generate(
             model='4o-mini',
@@ -94,29 +102,25 @@ def query():
         else:
             summary_text = summary_response.strip()
 
-        # Generate a PDF from the summary text using FPDF.
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         pdf.multi_cell(0, 10, summary_text)
         
-        # Save the PDF to a temporary file.
         temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
         pdf.output(temp_pdf.name)
         temp_pdf.close()
 
         return send_file(temp_pdf.name, as_attachment=True, download_name="Paper_Summary.pdf")
 
-    # Otherwise, process as a normal chat/research query.
+    # Process as a normal chat/research query.
     user_id = data.get("user_id", "unknown_user")
-    # Generate a new session ID if one is not provided.
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     message = data.get("text", "")
 
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
-    # Initialize conversation history with an introduction if it's a new session.
     if session_id not in conversation_history:
         intro_message = (
             "Hello! I am Research Assistant Bot. I specialize in retrieving and summarizing academic research, "
@@ -126,22 +130,20 @@ def query():
     else:
         intro_message = None
 
-    # Append the user's message to the conversation history.
     conversation_history[session_id].append(("user", message))
 
-    # Determine whether to treat the query as research-related.
-    if is_research_query(message) and not is_greeting_query(message):
+    classification = classify_query(message)
+    
+    if classification == "research":
         # Always use 3 results.
         search_results = google_search(message, num_results=3)
         search_info = "\n".join(search_results) if search_results else "No relevant research found."
 
-        # Build conversation context.
         query_with_context = ""
         for sender, text in conversation_history[session_id]:
             query_with_context += f"{sender.capitalize()}: {text}\n"
         query_with_context += f"\nResearch Findings:\n{search_info}"
 
-        # Call the LLM with a research assistant prompt.
         research_response = generate(
             model='4o-mini',
             system=(
@@ -162,8 +164,34 @@ def query():
         summary_heading = "**📚 Research Summary:**\n"
         papers_heading = "**🔗 Relevant Research Papers & Datasets:**\n"
         bot_reply = f"{summary_heading}{response_text}\n\n{papers_heading}{search_info}"
+    
+    elif classification == "greeting":
+        # Use general conversation branch.
+        query_with_context = ""
+        for sender, text in conversation_history[session_id]:
+            query_with_context += f"{sender.capitalize()}: {text}\n"
+        general_response = generate(
+            model='4o-mini',
+            system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
+            query=query_with_context,
+            temperature=0.5,
+            lastk=0,
+            session_id=session_id
+        )
+        if isinstance(general_response, dict):
+            response_text = general_response.get('response', "").strip()
+        else:
+            response_text = general_response.strip()
+        bot_reply = response_text
+    
+    elif classification == "other":
+        # Out-of-scope response.
+        bot_reply = (
+            "I'm a research paper assistant and I specialize in academic research, datasets, and scientific studies. "
+            "I'm sorry, but I can only help with research-related queries. Please ask me about research topics or papers."
+        )
     else:
-        # General conversational branch.
+        # Fallback to general conversation.
         query_with_context = ""
         for sender, text in conversation_history[session_id]:
             query_with_context += f"{sender.capitalize()}: {text}\n"
@@ -181,10 +209,8 @@ def query():
             response_text = general_response.strip()
         bot_reply = response_text
 
-    # Append the bot's reply to the conversation history.
     conversation_history[session_id].append(("bot", bot_reply))
 
-    # For the very first interaction, prepend the introduction.
     if intro_message and len(conversation_history[session_id]) == 2:
         bot_reply = f"{intro_message}\n\n{bot_reply}"
 
