@@ -53,6 +53,8 @@ def google_search(query, num_results=3):
         "OR site:arxiv.org OR site:worldbank.org OR site:europa.eu OR site:sciencedirect.com OR site:scholar.google.com"
     )
     
+    print(f"[DEBUG] Google search query: {search_query}")
+    
     url = "https://www.googleapis.com/customsearch/v1"
     params = {
         'q': search_query,
@@ -62,19 +64,25 @@ def google_search(query, num_results=3):
     }
     
     response = requests.get(url, params=params)
+    print(f"[DEBUG] Google search API response status: {response.status_code}")
+    
     attachments = []
     summary_texts = []
     
     if response.status_code != 200:
-        print(f"Google Search API Error: {response.status_code}, {response.text}")
+        print(f"[ERROR] Google Search API Error: {response.status_code}, {response.text}")
         return "No relevant research found.", []
     
     results = response.json().get("items", [])
+    print(f"[DEBUG] Google search returned {len(results)} items.")
+    
     for item in results:
-        summary_texts.append(f"**{item.get('title', 'No title available')}**")
+        title = item.get('title', 'No title available')
+        summary_texts.append(f"**{title}**")
         attachments.append(format_search_attachment(item))
     
     summary_text = "\n".join(summary_texts) if summary_texts else "No relevant research found."
+    print(f"[DEBUG] Google search summary text: {summary_text}")
     return summary_text, attachments
 
 def classify_query(message):
@@ -86,6 +94,8 @@ def classify_query(message):
         f"Is the following message a simple greeting? Answer with just one word: 'greeting' if yes, otherwise answer 'not greeting'. "
         f"Message: \"{message}\""
     )
+    print(f"[DEBUG] Classification prompt: {prompt}")
+    
     classification = generate(
         model='4o-mini',
         system="You are a query classifier. Determine if the user message is a greeting.",
@@ -98,11 +108,15 @@ def classify_query(message):
         result = classification.get('response', '').strip().lower()
     else:
         result = classification.strip().lower()
+    
+    print(f"[DEBUG] Raw classification result: {result}")
     return "greeting" if result == "greeting" else "research"
 
 @app.route('/query', methods=['POST'])
 def query():
+    print("[INFO] Received query request.")
     data = request.get_json()
+    print(f"[DEBUG] Request data: {data}")
 
     # Handle summarization action.
     if data.get("action", "").lower() == "summarize":
@@ -123,6 +137,7 @@ def query():
             summary_text = summary_response.get('response', '').strip()
         else:
             summary_text = summary_response.strip()
+        print(f"[DEBUG] Summarization response: {summary_text}")
 
         pdf = FPDF()
         pdf.add_page()
@@ -139,8 +154,10 @@ def query():
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     message = data.get("text", "")
+    print(f"[DEBUG] user_id: {user_id}, session_id: {session_id}, message: {message}")
 
     if data.get("bot") or not message:
+        print("[INFO] Message ignored because it's from bot or empty.")
         return jsonify({"status": "ignored"})
 
     if session_id not in conversation_history:
@@ -149,15 +166,17 @@ def query():
             "datasets, and scientific studies. How may I assist you today?"
         )
         conversation_history[session_id] = [("bot", intro_message)]
+        print(f"[DEBUG] New session created with intro message.")
     else:
         intro_message = None
 
     conversation_history[session_id].append(("user", message))
     classification = classify_query(message)
+    print(f"[DEBUG] Classification for message '{message}': {classification}")
 
     if classification == "greeting":
-        # Handle as a general conversational greeting.
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
+        print(f"[DEBUG] Context for general response:\n{query_with_context}")
         general_response = generate(
             model='4o-mini',
             system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
@@ -172,11 +191,13 @@ def query():
             response_text = general_response.strip()
         bot_reply = response_text
         result = {"text": bot_reply, "session_id": session_id}
+        print(f"[DEBUG] General response: {bot_reply}")
     
     else:  # Everything not a greeting is handled as research.
         summary_text, attachments = google_search(message, num_results=3)
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         query_with_context += f"\nResearch Findings:\n{summary_text}"
+        print(f"[DEBUG] Context for research response:\n{query_with_context}")
 
         research_response = generate(
             model='4o-mini',
@@ -194,16 +215,26 @@ def query():
         else:
             response_text = research_response.strip()
 
+        print(f"[DEBUG] Research LLM response: {response_text}")
+
+        if not response_text:
+            response_text = "I'm sorry, I couldn't retrieve additional research findings for that topic."
+            print("[DEBUG] Using fallback research response.")
+
         summary_heading = "**📚 Research Summary:**\n"
         papers_heading = "**🔗 Relevant Research Papers & Datasets:**\n"
         bot_reply = f"{summary_heading}{response_text}\n\n{papers_heading}{summary_text}"
         result = {"text": bot_reply, "session_id": session_id, "attachments": attachments}
+        print(f"[DEBUG] Final research response: {bot_reply}")
 
     conversation_history[session_id].append(("bot", result["text"]))
+    print(f"[DEBUG] Updated conversation history for session {session_id}: {conversation_history[session_id]}")
 
     if intro_message and len(conversation_history[session_id]) == 2:
         result["text"] = f"{intro_message}\n\n{result['text']}"
+        print(f"[DEBUG] Prepending intro message: {result['text']}")
 
+    print(f"[INFO] Sending final response for session {session_id}")
     return jsonify(result)
 
 @app.errorhandler(404)
