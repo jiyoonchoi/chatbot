@@ -18,33 +18,6 @@ CSE_ID = os.environ.get("googleSearchId")
 # Global store for conversation history (keyed by session_id).
 conversation_history = {}
 
-def send_typing_indicator(room_id):
-    """
-    Sends a typing indicator to Rocket.Chat for the specified room.
-    Assumes RC_url, RC_token, and RC_userId are set as environment variables.
-    """
-    RC_URL = os.environ.get("RC_url")
-    RC_TOKEN = os.environ.get("RC_token")
-    RC_USER_ID = os.environ.get("RC_userId")
-    
-    if not (RC_URL and RC_TOKEN and RC_USER_ID):
-        print("Rocket.Chat credentials not fully configured.")
-        return
-
-    url = f"{RC_URL}/api/v1/chat.sendTyping"
-    payload = {"roomId": room_id}
-    headers = {
-        "X-Auth-Token": RC_TOKEN,
-        "X-User-Id": RC_USER_ID,
-        "Content-Type": "application/json"
-    }
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        if response.status_code != 200:
-            print(f"Error sending typing indicator: {response.status_code}, {response.text}")
-    except Exception as e:
-        print(f"Exception sending typing indicator: {e}")
-
 def format_search_attachment(item):
     """
     Formats a single search result item into a Rocket.Chat attachment with action buttons.
@@ -125,7 +98,6 @@ def classify_query(message):
         result = classification.get('response', '').strip().lower()
     else:
         result = classification.strip().lower()
-    # If the result is 'greeting', return that; otherwise, default to research.
     return "greeting" if result == "greeting" else "research"
 
 @app.route('/query', methods=['POST'])
@@ -167,14 +139,9 @@ def query():
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     message = data.get("text", "")
-    room_id = data.get("room_id")  # Optional: Rocket.Chat room ID.
 
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
-
-    # Optionally send a typing indicator.
-    if room_id:
-        send_typing_indicator(room_id)
 
     if session_id not in conversation_history:
         intro_message = (
