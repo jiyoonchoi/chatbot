@@ -6,6 +6,11 @@ from llmproxy import generate
 import requests
 from fpdf import FPDF
 from dotenv import load_dotenv
+from urllib.parse import urljoin
+
+# Import PDF and HTML parsing libraries.
+import PyPDF2
+from bs4 import BeautifulSoup
 
 load_dotenv()
 
@@ -78,6 +83,57 @@ def google_search(query, num_results=3):
         )
     return search_summaries
 
+def extract_text_from_pdf(pdf_path):
+    """Extract text from a PDF file using PyPDF2."""
+    text = ""
+    try:
+        with open(pdf_path, "rb") as f:
+            pdf_reader = PyPDF2.PdfReader(f)
+            for page in pdf_reader.pages:
+                page_text = page.extract_text() or ""
+                text += page_text + "\n"
+    except Exception as e:
+        print(f"Error reading PDF: {e}")
+    return text
+
+def fetch_paper_text(link):
+    """Attempts to retrieve the paper's text from the given link.
+       Always fetch HTML, then look for an embedded PDF link.
+    """
+    paper_text = ""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/98.0.4758.102 Safari/537.36"
+    }
+    
+    # Fetch HTML content.
+    response = requests.get(link, headers=headers)
+    if response.status_code != 200:
+        print(f"Error fetching URL: {link} - Status code: {response.status_code}")
+        return paper_text
+    soup = BeautifulSoup(response.content, "html.parser")
+    
+    # Debug: print a snippet of the HTML to verify content retrieval.
+    # print(soup.prettify()[:500])
+    
+    # Try to find an anchor with a PDF link.
+    pdf_anchor = soup.find("a", href=lambda href: href and ".pdf" in href.lower())
+    if pdf_anchor:
+        pdf_link = urljoin(link, pdf_anchor.get("href"))
+        pdf_response = requests.get(pdf_link, headers=headers)
+        if pdf_response.status_code == 200:
+            temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            with open(temp_pdf.name, "wb") as f:
+                f.write(pdf_response.content)
+            paper_text = extract_text_from_pdf(temp_pdf.name)
+        else:
+            print(f"Error fetching PDF link: {pdf_link} - Status code: {pdf_response.status_code}")
+    else:
+        # If no PDF link is found, fallback to HTML text.
+        paper_text = soup.get_text(separator="\n")
+    return paper_text
+
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
@@ -88,13 +144,22 @@ def query():
         if not paper_link:
             return jsonify({"error": "No paper link provided"}), 400
 
-        # Updated summary prompt to instruct the LLM to fetch and summarize the paper.
+        # Inform the front-end that processing has started (for loading visuals).
+        print("Summarization process started...")
+
+        # Fetch the paper's text (from HTML and/or linked PDF).
+        paper_text = fetch_paper_text(paper_link)
+        if not paper_text or len(paper_text.strip()) == 0:
+            return jsonify({"error": "Could not retrieve paper content"}), 400
+
+        # Limit the text for summarization to avoid huge prompts.
+        excerpt = paper_text[:3000]
         summary_prompt = (
-            f"Please fetch the content of the academic paper available at: {paper_link} and provide a concise summary highlighting the key findings, methodology, and conclusions."
+            f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
         )
         summary_response = generate(
             model='4o-mini',
-            system="You are an expert summarizer of academic papers. Fetch and summarize the paper's content clearly and concisely.",
+            system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
             query=summary_prompt,
             temperature=0.0,
             lastk=0,
@@ -105,6 +170,7 @@ def query():
         else:
             summary_text = summary_response.strip()
 
+        # Create a PDF file from the summary.
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
@@ -165,7 +231,6 @@ def query():
             response_text = research_response.strip()
 
         summary_heading = "*📚 Brief Summaries of Most Relevant Research Papers:*\n"
-        # Removed the separate papers heading so only the top 3 research papers are listed.
         bot_reply = f"{summary_heading}{response_text}\n\n{search_info}"
     
     elif classification == "greeting":
