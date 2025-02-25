@@ -1,6 +1,8 @@
 import os
 import json
 import requests
+from dotenv import load_dotenv
+load_dotenv()
 
 # Read proxy config from environment
 end_point = os.environ.get("endPoint")
