@@ -18,35 +18,37 @@ CSE_ID = os.environ.get("googleSearchId")
 # Global store for conversation history (keyed by session_id).
 conversation_history = {}
 
-def classify_query(message):
+def format_search_attachment(item):
     """
-    Uses an LLM agent to classify the query.
-    The LLM should return one word: 'greeting', 'research', or 'other'.
+    Formats a single search result item into a Rocket.Chat attachment with action buttons.
     """
-    prompt = (
-        f"Determine if the following message is a greeting, a research query, or something else. "
-        f"Reply with just one word: 'greeting' if it's a simple greeting, 'research' if it's asking for research-related information, or 'other' if it is unrelated to research. "
-        f"Message: \"{message}\""
-    )
-    classification = generate(
-        model='4o-mini',
-        system="You are a query classifier. Classify the user message as 'greeting', 'research', or 'other'.",
-        query=prompt,
-        temperature=0.0,
-        lastk=0,
-        session_id="classify_" + str(uuid.uuid4())
-    )
-    if isinstance(classification, dict):
-        classification_text = classification.get('response', '').strip().lower()
-    else:
-        classification_text = classification.strip().lower()
-    return classification_text
+    title = item.get("title", "No title available")
+    snippet = item.get("snippet", "No description available")
+    link = item.get("link", "#")
+    
+    # Build an attachment that contains two action buttons.
+    attachment = {
+        "title": title,
+        "text": snippet,
+        "actions": [
+            {
+                "type": "button",
+                "text": "View Paper",
+                "url": link
+            },
+            {
+                "type": "button",
+                "text": "Summarize Paper",
+                # Depending on your Rocket.Chat integration, you might need a URL or a custom command payload.
+                "url": f"command:summarize?link={link}"
+            }
+        ]
+    }
+    return attachment
 
 def google_search(query, num_results=3):
     """
-    Performs a Google Custom Search focused on research papers and datasets.
-    For each result, a 'View Paper' link is provided along with an interactive 
-    'Summarize Paper' button.
+    Performs a Google Custom Search and returns both a plain text summary and a list of attachments.
     """
     search_query = (
         f"{query} filetype:pdf OR site:researchgate.net OR site:ncbi.nlm.nih.gov OR site:data.gov "
@@ -62,27 +64,50 @@ def google_search(query, num_results=3):
     }
     
     response = requests.get(url, params=params)
+    attachments = []
+    summary_texts = []
+    
     if response.status_code != 200:
         print(f"Google Search API Error: {response.status_code}, {response.text}")
-        return []
+        return "No relevant research found.", []
     
     results = response.json().get("items", [])
-    search_summaries = []
     for item in results:
-        title = item.get("title", "No title available")
-        snippet = item.get("snippet", "No description available")
-        link = item.get("link", "#")
-        # The "Summarize Paper" button is added as a secondary command.
-        search_summaries.append(
-            f"**{title}**\n{snippet}\n[🔗 View Paper]({link})  [Summarize Paper](command:summarize?link={link})\n"
-        )
-    return search_summaries
+        # Append a brief text summary.
+        summary_texts.append(f"**{item.get('title', 'No title available')}**")
+        # Create an attachment for this result.
+        attachments.append(format_search_attachment(item))
+    
+    summary_text = "\n".join(summary_texts) if summary_texts else "No relevant research found."
+    return summary_text, attachments
+
+def classify_query(message):
+    """
+    Uses an LLM agent to classify the query.
+    Returns one of 'greeting', 'research', or 'other'.
+    """
+    prompt = (
+        f"Determine if the following message is a greeting, a research query, or something else. "
+        f"Reply with just one word: 'greeting', 'research', or 'other'. "
+        f"Message: \"{message}\""
+    )
+    classification = generate(
+        model='4o-mini',
+        system="You are a query classifier. Classify the user message as 'greeting', 'research', or 'other'.",
+        query=prompt,
+        temperature=0.0,
+        lastk=0,
+        session_id="classify_" + str(uuid.uuid4())
+    )
+    if isinstance(classification, dict):
+        return classification.get('response', '').strip().lower()
+    else:
+        return classification.strip().lower()
 
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
 
-    # Check if this is a summarization action.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
@@ -113,7 +138,6 @@ def query():
 
         return send_file(temp_pdf.name, as_attachment=True, download_name="Paper_Summary.pdf")
 
-    # Process as a normal chat/research query.
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     message = data.get("text", "")
@@ -131,18 +155,14 @@ def query():
         intro_message = None
 
     conversation_history[session_id].append(("user", message))
-
     classification = classify_query(message)
-    
-    if classification == "research":
-        # Always use 3 results.
-        search_results = google_search(message, num_results=3)
-        search_info = "\n".join(search_results) if search_results else "No relevant research found."
 
+    if classification == "research":
+        summary_text, attachments = google_search(message, num_results=3)
         query_with_context = ""
-        for sender, text in conversation_history[session_id]:
-            query_with_context += f"{sender.capitalize()}: {text}\n"
-        query_with_context += f"\nResearch Findings:\n{search_info}"
+        for _, text in conversation_history[session_id]:
+            query_with_context += f"{text}\n"
+        query_with_context += f"\nResearch Findings:\n{summary_text}"
 
         research_response = generate(
             model='4o-mini',
@@ -163,10 +183,11 @@ def query():
 
         summary_heading = "**📚 Research Summary:**\n"
         papers_heading = "**🔗 Relevant Research Papers & Datasets:**\n"
-        bot_reply = f"{summary_heading}{response_text}\n\n{papers_heading}{search_info}"
+        bot_reply = f"{summary_heading}{response_text}\n\n{papers_heading}{summary_text}"
+        # Include the attachments in the final payload.
+        result = {"text": bot_reply, "session_id": session_id, "attachments": attachments}
     
     elif classification == "greeting":
-        # Use general conversation branch.
         query_with_context = ""
         for sender, text in conversation_history[session_id]:
             query_with_context += f"{sender.capitalize()}: {text}\n"
@@ -183,15 +204,16 @@ def query():
         else:
             response_text = general_response.strip()
         bot_reply = response_text
+        result = {"text": bot_reply, "session_id": session_id}
     
     elif classification == "other":
-        # Out-of-scope response.
         bot_reply = (
             "I'm a research paper assistant and I specialize in academic research, datasets, and scientific studies. "
             "I'm sorry, but I can only help with research-related queries. Please ask me about research topics or papers."
         )
+        result = {"text": bot_reply, "session_id": session_id}
+    
     else:
-        # Fallback to general conversation.
         query_with_context = ""
         for sender, text in conversation_history[session_id]:
             query_with_context += f"{sender.capitalize()}: {text}\n"
@@ -208,13 +230,14 @@ def query():
         else:
             response_text = general_response.strip()
         bot_reply = response_text
+        result = {"text": bot_reply, "session_id": session_id}
 
-    conversation_history[session_id].append(("bot", bot_reply))
+    conversation_history[session_id].append(("bot", result["text"]))
 
     if intro_message and len(conversation_history[session_id]) == 2:
-        bot_reply = f"{intro_message}\n\n{bot_reply}"
+        result["text"] = f"{intro_message}\n\n{result['text']}"
 
-    return jsonify({"text": bot_reply, "session_id": session_id})
+    return jsonify(result)
 
 @app.errorhandler(404)
 def page_not_found(e):
