@@ -15,6 +15,8 @@ from bs4 import BeautifulSoup
 load_dotenv()
 
 app = Flask(__name__)
+app.config['PDF_FOLDER'] = os.path.join(os.getcwd(), 'static', 'pdfs')
+os.makedirs(app.config['PDF_FOLDER'], exist_ok=True)
 
 # Environment variables for Google Custom Search API.
 API_KEY = os.environ.get("googleApiKey")
@@ -53,7 +55,7 @@ def google_search(query, num_results=3):
     """
     Performs a Google Custom Search focused on research papers and datasets.
     For each result, a 'View Paper' link is provided along with an interactive 
-    'Summarize Paper' button.
+    'Summarize Paper' command.
     """
     search_query = (
         f"{query} filetype:pdf OR site:researchgate.net OR site:ncbi.nlm.nih.gov OR site:data.gov "
@@ -80,6 +82,7 @@ def google_search(query, num_results=3):
         title = item.get("title", "No title available")
         snippet = item.get("snippet", "No description available")
         link = item.get("link", "#")
+        # Each paper shows a short summary and includes a "View Paper" link and a "Summarize Paper" command.
         search_summaries.append(
             f"**{title}**\n{snippet}\n[🔗 View Paper]({link})  [Summarize Paper](command:summarize?link={link})\n"
         )
@@ -101,8 +104,9 @@ def extract_text_from_pdf(pdf_path):
     return text
 
 def fetch_paper_text(link):
-    """Attempts to retrieve the paper's text from the given link.
-       Always fetch HTML, then look for an embedded PDF link.
+    """
+    Attempts to retrieve the paper's text from the given link.
+    It always fetches the HTML and then looks for an embedded PDF link.
     """
     paper_text = ""
     headers = {
@@ -120,7 +124,7 @@ def fetch_paper_text(link):
     
     print(f"DEBUG: Fetched HTML snippet: {soup.get_text()[:300]}")
     
-    # Try to find an anchor with a PDF link.
+    # Look for an anchor that contains ".pdf" (even if the link doesn't end with .pdf)
     pdf_anchor = soup.find("a", href=lambda href: href and ".pdf" in href.lower())
     if pdf_anchor:
         pdf_link = urljoin(link, pdf_anchor.get("href"))
@@ -146,6 +150,7 @@ def query():
     data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
 
+    # If the action is "summarize", process the full-paper summarization.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
@@ -159,6 +164,7 @@ def query():
             print("DEBUG: Could not retrieve paper content")
             return jsonify({"error": "Could not retrieve paper content"}), 400
 
+        # Use the first 3000 characters to limit the prompt size (adjust as needed)
         excerpt = paper_text[:3000]
         print(f"DEBUG: Excerpt for summarization (first 3000 chars): {excerpt[:200]}...")
         summary_prompt = (
@@ -179,19 +185,21 @@ def query():
             summary_text = summary_response.strip()
         print(f"DEBUG: Received summary text: {summary_text[:300]}...")
 
+        # Generate a PDF from the summary.
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         pdf.multi_cell(0, 10, summary_text)
         
-        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        pdf.output(temp_pdf.name)
-        temp_pdf.close()
-        print(f"DEBUG: Generated summary PDF at: {temp_pdf.name}")
+        pdf_filename = f"{uuid.uuid4()}.pdf"
+        pdf_path = os.path.join(app.config['PDF_FOLDER'], pdf_filename)
+        pdf.output(pdf_path)
+        print(f"DEBUG: Generated summary PDF at: {pdf_path}")
 
-        return send_file(temp_pdf.name, as_attachment=True, download_name="Paper_Summary.pdf")  # type: ignore
+        # Return the PDF file with headers that prompt the browser to open it inline.
+        return send_file(pdf_path, as_attachment=False, download_name="Paper_Summary.pdf")
 
-    # Process as a normal chat/research query.
+    # Otherwise, process a normal research query.
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     message = data.get("text", "")
