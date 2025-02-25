@@ -18,6 +18,33 @@ CSE_ID = os.environ.get("googleSearchId")
 # Global store for conversation history (keyed by session_id).
 conversation_history = {}
 
+def send_typing_indicator(room_id):
+    """
+    Sends a typing indicator to Rocket.Chat for the specified room.
+    Assumes RC_url, RC_token, and RC_userId are set as environment variables.
+    """
+    RC_URL = os.environ.get("RC_url")
+    RC_TOKEN = os.environ.get("RC_token")
+    RC_USER_ID = os.environ.get("RC_userId")
+    
+    if not (RC_URL and RC_TOKEN and RC_USER_ID):
+        print("Rocket.Chat credentials not fully configured.")
+        return
+
+    url = f"{RC_URL}/api/v1/chat.sendTyping"
+    payload = {"roomId": room_id}
+    headers = {
+        "X-Auth-Token": RC_TOKEN,
+        "X-User-Id": RC_USER_ID,
+        "Content-Type": "application/json"
+    }
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code != 200:
+            print(f"Error sending typing indicator: {response.status_code}, {response.text}")
+    except Exception as e:
+        print(f"Exception sending typing indicator: {e}")
+
 def format_search_attachment(item):
     """
     Formats a single search result item into a Rocket.Chat attachment with action buttons.
@@ -26,7 +53,6 @@ def format_search_attachment(item):
     snippet = item.get("snippet", "No description available")
     link = item.get("link", "#")
     
-    # Build an attachment that contains two action buttons.
     attachment = {
         "title": title,
         "text": snippet,
@@ -39,7 +65,6 @@ def format_search_attachment(item):
             {
                 "type": "button",
                 "text": "Summarize Paper",
-                # Depending on your Rocket.Chat integration, you might need a URL or a custom command payload.
                 "url": f"command:summarize?link={link}"
             }
         ]
@@ -48,7 +73,7 @@ def format_search_attachment(item):
 
 def google_search(query, num_results=3):
     """
-    Performs a Google Custom Search and returns both a plain text summary and a list of attachments.
+    Performs a Google Custom Search and returns a plain text summary and a list of attachments.
     """
     search_query = (
         f"{query} filetype:pdf OR site:researchgate.net OR site:ncbi.nlm.nih.gov OR site:data.gov "
@@ -73,9 +98,7 @@ def google_search(query, num_results=3):
     
     results = response.json().get("items", [])
     for item in results:
-        # Append a brief text summary.
         summary_texts.append(f"**{item.get('title', 'No title available')}**")
-        # Create an attachment for this result.
         attachments.append(format_search_attachment(item))
     
     summary_text = "\n".join(summary_texts) if summary_texts else "No relevant research found."
@@ -84,30 +107,32 @@ def google_search(query, num_results=3):
 def classify_query(message):
     """
     Uses an LLM agent to classify the query.
-    Returns one of 'greeting', 'research', or 'other'.
+    Returns 'greeting' if the message is a greeting; otherwise, defaults to research.
     """
     prompt = (
-        f"Determine if the following message is a greeting, a research query, or something else. "
-        f"Reply with just one word: 'greeting', 'research', or 'other'. "
+        f"Is the following message a simple greeting? Answer with just one word: 'greeting' if yes, otherwise answer 'not greeting'. "
         f"Message: \"{message}\""
     )
     classification = generate(
         model='4o-mini',
-        system="You are a query classifier. Classify the user message as 'greeting', 'research', or 'other'.",
+        system="You are a query classifier. Determine if the user message is a greeting.",
         query=prompt,
         temperature=0.0,
         lastk=0,
         session_id="classify_" + str(uuid.uuid4())
     )
     if isinstance(classification, dict):
-        return classification.get('response', '').strip().lower()
+        result = classification.get('response', '').strip().lower()
     else:
-        return classification.strip().lower()
+        result = classification.strip().lower()
+    # If the result is 'greeting', return that; otherwise, default to research.
+    return "greeting" if result == "greeting" else "research"
 
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
 
+    # Handle summarization action.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
@@ -138,17 +163,23 @@ def query():
 
         return send_file(temp_pdf.name, as_attachment=True, download_name="Paper_Summary.pdf")
 
+    # Process as a normal chat/research query.
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     message = data.get("text", "")
+    room_id = data.get("room_id")  # Optional: Rocket.Chat room ID.
 
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
+    # Optionally send a typing indicator.
+    if room_id:
+        send_typing_indicator(room_id)
+
     if session_id not in conversation_history:
         intro_message = (
             "Hello! I am Research Assistant Bot. I specialize in retrieving and summarizing academic research, "
-            "datasets, and scientific studies. I can also chat generally. How may I assist you today?"
+            "datasets, and scientific studies. How may I assist you today?"
         )
         conversation_history[session_id] = [("bot", intro_message)]
     else:
@@ -157,19 +188,34 @@ def query():
     conversation_history[session_id].append(("user", message))
     classification = classify_query(message)
 
-    if classification == "research":
+    if classification == "greeting":
+        # Handle as a general conversational greeting.
+        query_with_context = "\n".join(text for _, text in conversation_history[session_id])
+        general_response = generate(
+            model='4o-mini',
+            system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
+            query=query_with_context,
+            temperature=0.5,
+            lastk=0,
+            session_id=session_id
+        )
+        if isinstance(general_response, dict):
+            response_text = general_response.get('response', "").strip()
+        else:
+            response_text = general_response.strip()
+        bot_reply = response_text
+        result = {"text": bot_reply, "session_id": session_id}
+    
+    else:  # Everything not a greeting is handled as research.
         summary_text, attachments = google_search(message, num_results=3)
-        query_with_context = ""
-        for _, text in conversation_history[session_id]:
-            query_with_context += f"{text}\n"
+        query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         query_with_context += f"\nResearch Findings:\n{summary_text}"
 
         research_response = generate(
             model='4o-mini',
             system=(
-                "You are a Research Assistant AI that specializes in retrieving and summarizing "
-                "academic research, datasets, and scientific studies. Provide well-cited, fact-based insights "
-                "from reputable sources. If the query is general chat, respond as a friendly assistant."
+                "You are a Research Assistant AI that specializes in retrieving and summarizing academic research, "
+                "datasets, and scientific studies. Provide well-cited, fact-based insights from reputable sources."
             ),
             query=query_with_context,
             temperature=0.0,
@@ -184,53 +230,7 @@ def query():
         summary_heading = "**📚 Research Summary:**\n"
         papers_heading = "**🔗 Relevant Research Papers & Datasets:**\n"
         bot_reply = f"{summary_heading}{response_text}\n\n{papers_heading}{summary_text}"
-        # Include the attachments in the final payload.
         result = {"text": bot_reply, "session_id": session_id, "attachments": attachments}
-    
-    elif classification == "greeting":
-        query_with_context = ""
-        for _, text in conversation_history[session_id]:
-            query_with_context += f"{text}\n"
-        general_response = generate(
-            model='4o-mini',
-            system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
-            query=query_with_context,
-            temperature=0.5,
-            lastk=0,
-            session_id=session_id
-        )
-        if isinstance(general_response, dict):
-            response_text = general_response.get('response', "").strip()
-        else:
-            response_text = general_response.strip()
-        bot_reply = response_text
-        result = {"text": bot_reply, "session_id": session_id}
-    
-    elif classification == "other":
-        bot_reply = (
-            "I'm a research paper assistant and I specialize in academic research, datasets, and scientific studies. "
-            "I'm sorry, but I can only help with research-related queries. Please ask me about research topics or papers."
-        )
-        result = {"text": bot_reply, "session_id": session_id}
-    
-    else:
-        query_with_context = ""
-        for _, text in conversation_history[session_id]:
-            query_with_context += f"{text}\n"
-        general_response = generate(
-            model='4o-mini',
-            system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
-            query=query_with_context,
-            temperature=0.5,
-            lastk=0,
-            session_id=session_id
-        )
-        if isinstance(general_response, dict):
-            response_text = general_response.get('response', "").strip()
-        else:
-            response_text = general_response.strip()
-        bot_reply = response_text
-        result = {"text": bot_reply, "session_id": session_id}
 
     conversation_history[session_id].append(("bot", result["text"]))
 
