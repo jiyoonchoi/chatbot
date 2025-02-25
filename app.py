@@ -164,7 +164,7 @@ def query():
         else:
             response_text = research_response.strip()
 
-        summary_heading = "**📚 Research Summary:**\n"
+        summary_heading = "*📚 Brief Summaries of Most Relevant Research Papers:*\n"
         # Removed the separate papers heading so only the top 3 research papers are listed.
         bot_reply = f"{summary_heading}{response_text}\n\n{search_info}"
     
