@@ -189,8 +189,8 @@ def query():
     
     elif classification == "greeting":
         query_with_context = ""
-        for sender, text in conversation_history[session_id]:
-            query_with_context += f"{sender.capitalize()}: {text}\n"
+        for _, text in conversation_history[session_id]:
+            query_with_context += f"{text}\n"
         general_response = generate(
             model='4o-mini',
             system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
@@ -215,8 +215,8 @@ def query():
     
     else:
         query_with_context = ""
-        for sender, text in conversation_history[session_id]:
-            query_with_context += f"{sender.capitalize()}: {text}\n"
+        for _, text in conversation_history[session_id]:
+            query_with_context += f"{text}\n"
         general_response = generate(
             model='4o-mini',
             system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
