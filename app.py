@@ -137,22 +137,16 @@ def fetch_paper_text(link):
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
-
-    # Check if this is a summarization action.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
             return jsonify({"error": "No paper link provided"}), 400
 
-        # Inform the front-end that processing has started (for loading visuals).
         print("Summarization process started...")
-
-        # Fetch the paper's text (from HTML and/or linked PDF).
         paper_text = fetch_paper_text(paper_link)
         if not paper_text or len(paper_text.strip()) == 0:
             return jsonify({"error": "Could not retrieve paper content"}), 400
 
-        # Limit the text for summarization to avoid huge prompts.
         excerpt = paper_text[:3000]
         summary_prompt = (
             f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
@@ -165,22 +159,19 @@ def query():
             lastk=0,
             session_id="summarize_" + str(uuid.uuid4())
         )
-        if isinstance(summary_response, dict):
-            summary_text = summary_response.get('response', '').strip()
-        else:
-            summary_text = summary_response.strip()
+        summary_text = summary_response.get('response', '').strip() if isinstance(summary_response, dict) else summary_response.strip()
 
-        # Create a PDF file from the summary.
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         pdf.multi_cell(0, 10, summary_text)
         
-        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        pdf.output(temp_pdf.name)
-        temp_pdf.close()
+        pdf_path = os.path.join('static', f"{uuid.uuid4()}.pdf")
+        pdf.output(pdf_path)
 
-        return send_file(temp_pdf.name, as_attachment=True, download_name="Paper_Summary.pdf")
+        # Return a JSON response with the URL to the PDF.
+        download_url = request.host_url + pdf_path
+        return jsonify({"download_url": download_url})
 
     # Process as a normal chat/research query.
     user_id = data.get("user_id", "unknown_user")
@@ -230,7 +221,7 @@ def query():
         else:
             response_text = research_response.strip()
 
-        summary_heading = "*📚 Brief Summaries of Most Relevant Research Papers:*\n"
+        summary_heading = "**📚 Brief Summaries of Most Relevant Research Papers:**\n"
         bot_reply = f"{summary_heading}{response_text}\n\n{search_info}"
     
     elif classification == "greeting":
