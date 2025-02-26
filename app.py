@@ -2,10 +2,9 @@ import os
 import uuid
 import io
 import tempfile
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from llmproxy import generate
 import requests
-from fpdf import FPDF
 from dotenv import load_dotenv
 from urllib.parse import urljoin
 import PyPDF2
@@ -137,13 +136,12 @@ def query():
         else:
             return jsonify({"error": "Unknown action"}), 400
 
-    # When a user clicks "Summarize Paper" we trigger the interactive message.
+    # When a user clicks "Summarize Paper", return an interactive message with two buttons.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
             print("DEBUG: No paper link provided in request")
             return jsonify({"error": "No paper link provided"}), 400
-        # Return an interactive message with two buttons rather than a markdown link.
         interactive_message = {
             "text": "Would you like a summary of the abstract only or a full overview?",
             "attachments": [
@@ -170,7 +168,7 @@ def query():
         print("DEBUG: Returning interactive button message")
         return jsonify(interactive_message)
 
-    # Conversation handling for research queries, greetings, etc.
+    # Handle general conversation queries.
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     message = data.get("text", "")
@@ -188,7 +186,6 @@ def query():
     classification = classify_query(message)
     if classification == "research":
         search_results = google_search(message, num_results=3)
-        # Build interactive attachments for each search result.
         interactive_attachments = []
         for result in search_results:
             attachment = {
@@ -211,8 +208,6 @@ def query():
                 ]
             }
             interactive_attachments.append(attachment)
-
-        # Build the query context with previous conversation.
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         research_response = generate(
             model='4o-mini',
@@ -234,7 +229,6 @@ def query():
         conversation_history[session_id].append(("bot", bot_reply))
         if intro_message and len(conversation_history[session_id]) == 2:
             bot_reply = f"{intro_message}\n\n{bot_reply}"
-        # Return both the bot reply and the interactive attachments for each search result.
         return jsonify({"text": bot_reply, "attachments": interactive_attachments, "session_id": session_id})
     elif classification == "greeting":
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
@@ -310,16 +304,8 @@ def handle_summarization(paper_link, action_type):
         summary_text = summary_response.strip()
 
     print(f"DEBUG: Received summary text: {summary_text[:300]}...")
-    # Generate PDF in memory using FPDF.
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, summary_text)
-    pdf_output = pdf.output(dest="S").encode("latin1")
-    pdf_buffer = io.BytesIO(pdf_output)
-    pdf_buffer.seek(0)
-    print("DEBUG: PDF generated in memory, ready for download")
-    return send_file(pdf_buffer, as_attachment=True, download_name="Paper_Summary.pdf", mimetype='application/pdf')
+    # Instead of generating a PDF, return the summary text as a new bot message.
+    return jsonify({"text": summary_text})
 
 @app.errorhandler(404)
 def page_not_found(e):
