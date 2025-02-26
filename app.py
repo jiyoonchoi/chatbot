@@ -21,18 +21,14 @@ conversation_history = {}
 
 def fetch_paper_text(link):
     """Fetches paper text from a given link, extracting either PDF or webpage content."""
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
     print(f"DEBUG: Fetching paper text from URL: {link}")
     response = requests.get(link, headers=headers)
     if response.status_code != 200:
         print(f"DEBUG: Error fetching URL: {link} - Status code: {response.status_code}")
         return ""
-
     soup = BeautifulSoup(response.content, "html.parser")
     pdf_anchor = soup.find("a", href=lambda href: href and ".pdf" in href.lower())
-    
     if pdf_anchor:
         pdf_link = urljoin(link, pdf_anchor.get("href"))
         print(f"DEBUG: Found PDF link: {pdf_link}")
@@ -45,7 +41,6 @@ def fetch_paper_text(link):
             return extract_text_from_pdf(temp_pdf.name)
         else:
             print(f"DEBUG: Failed to fetch PDF. Status: {pdf_response.status_code}")
-    
     print("DEBUG: No PDF found, extracting HTML text.")
     return soup.get_text(separator="\n")
 
@@ -62,19 +57,54 @@ def extract_text_from_pdf(pdf_path):
         print(f"DEBUG: Error reading PDF: {e}")
     return text
 
+def handle_summarization(paper_link, action_type):
+    """
+    Generates a summary of the requested paper text and returns it as a new message.
+    """
+    print(f"DEBUG: Handling summarization for {action_type} - {paper_link}")
+    paper_text = fetch_paper_text(paper_link)
+    if not paper_text.strip():
+        return jsonify({"text": "❌ Error: Unable to retrieve paper content."})
+    excerpt = paper_text[:3000]
+    summary_prompt = (
+        f"Summarize the abstract:\n\n{excerpt}"
+        if action_type == "summarize_abstract"
+        else f"Summarize the full paper while retaining all important details:\n\n{excerpt}"
+    )
+    print("DEBUG: Sending summary request to LLM model")
+    summary_response = generate(
+        model='4o-mini',
+        system="You are an expert summarizer of academic papers.",
+        query=summary_prompt,
+        temperature=0.0,
+        lastk=0,
+        session_id="summarize_" + str(uuid.uuid4())
+    )
+    if isinstance(summary_response, dict):
+        summary_text = summary_response.get('response', '').strip()
+    else:
+        summary_text = summary_response.strip()
+    print(f"DEBUG: Received summary text: {summary_text[:300]}...")
+    return jsonify({"text": summary_text})
+
 @app.route('/query', methods=['POST'])
 def query():
     """Handles incoming queries, including interactive button presses."""
     data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
-
-    if data.get("interactive_callback"):
-        action = data.get("action")
-        paper_link = data.get("link")
+    
+    # Check for interactive callback in top-level or within "params"
+    interactive = data.get("interactive_callback") or (data.get("params") and data["params"].get("interactive_callback"))
+    if interactive:
+        # Extract action and link from "params" if available; otherwise, use top-level keys.
+        params = data.get("params", {})
+        action = params.get("action") or data.get("action")
+        paper_link = params.get("link") or data.get("link")
         if action in ["summarize_abstract", "summarize_full"]:
             return handle_summarization(paper_link, action)
-        return jsonify({"error": "Unknown action"}), 400
+        return jsonify({"error": "Unknown interactive action"}), 400
 
+    # When a user clicks "Summarize Paper", return an interactive message with two buttons.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
@@ -88,62 +118,35 @@ def query():
                         {
                             "type": "button",
                             "text": "Abstract Only",
-                            "msg": f"/query",
-                            "msg_in_chat_window": True,
+                            "msg": "/query",  # The msg is still required for Rocket.Chat, even if hidden.
+                            "msg_in_chat_window": False,
                             "msg_processing_type": "sendMessage",
-                            "params": {"interactive_callback": True, "action": "summarize_abstract", "link": paper_link}
+                            "params": {
+                                "interactive_callback": True,
+                                "action": "summarize_abstract",
+                                "link": paper_link
+                            }
                         },
                         {
                             "type": "button",
                             "text": "Full Overview",
-                            "msg": f"/query",
-                            "msg_in_chat_window": True,
+                            "msg": "/query",
+                            "msg_in_chat_window": False,
                             "msg_processing_type": "sendMessage",
-                            "params": {"interactive_callback": True, "action": "summarize_full", "link": paper_link}
+                            "params": {
+                                "interactive_callback": True,
+                                "action": "summarize_full",
+                                "link": paper_link
+                            }
                         }
                     ]
                 }
             ]
         }
+        print("DEBUG: Returning interactive button message")
         return jsonify(interactive_message)
 
     return jsonify({"error": "Unsupported query type"}), 400
-
-def handle_summarization(paper_link, action_type):
-    """
-    Generates a summary of the requested paper text and returns it as a new message.
-    """
-    print(f"DEBUG: Handling summarization for {action_type} - {paper_link}")
-    paper_text = fetch_paper_text(paper_link)
-
-    if not paper_text.strip():
-        return jsonify({"text": "❌ Error: Unable to retrieve paper content."})
-
-    excerpt = paper_text[:3000]
-    
-    summary_prompt = (
-        f"Summarize the abstract:\n\n{excerpt}" if action_type == "summarize_abstract"
-        else f"Summarize the full paper while retaining all important details:\n\n{excerpt}"
-    )
-
-    print("DEBUG: Sending summary request to LLM model")
-    summary_response = generate(
-        model='4o-mini',
-        system="You are an expert summarizer of academic papers.",
-        query=summary_prompt,
-        temperature=0.0,
-        lastk=0,
-        session_id="summarize_" + str(uuid.uuid4())
-    )
-
-    if isinstance(summary_response, dict):
-        summary_text = summary_response.get('response', '').strip()
-    else:
-        summary_text = summary_response.strip()
-
-    print(f"DEBUG: Received summary text: {summary_text[:300]}...")
-
-    return jsonify({"text": summary_text})
 
 @app.errorhandler(404)
 def page_not_found(e):
