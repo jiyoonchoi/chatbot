@@ -115,7 +115,7 @@ def handle_summarize_full(session_id):
 
 def build_interactive_response(text, session_id):
     """
-    Builds a response payload with interactive buttons.
+    Helper to build a response payload with interactive buttons.
     """
     return {
         "text": text,
@@ -127,14 +127,12 @@ def build_interactive_response(text, session_id):
                     {
                         "type": "button",
                         "text": "Summarize Abstract",
-                        "msg": "summarize_abstract",
-                        "msg_in_chat_window": True
+                        "msg": "summarize_abstract"  # Backend action ID
                     },
                     {
                         "type": "button",
                         "text": "Summarize Full Paper",
-                        "msg": "summarize_full",
-                        "msg_in_chat_window": True
+                        "msg": "summarize_full"  # Backend action ID
                     }
                 ]
             }
