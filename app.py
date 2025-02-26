@@ -49,9 +49,8 @@ def classify_query(message):
 def google_search(query, num_results=3):
     """
     Perform a Google Custom Search for research-related PDFs and resources.
-    Enhances the query to target PDFs or select research domains.
-    Returns a list of formatted markdown strings with 'View Paper' and
-    'Summarize Paper' buttons.
+    Enhances the query to target research papers.
+    Returns a list of result objects containing title, snippet, and link.
     """
     search_query = (
         f"{query} filetype:pdf OR site:researchgate.net OR site:ncbi.nlm.nih.gov OR site:data.gov "
@@ -65,16 +64,18 @@ def google_search(query, num_results=3):
         print(f"DEBUG: Google Search API Error: {response.status_code}, {response.text}")
         return []
     results = response.json().get("items", [])
-    search_summaries = []
+    search_results = []
     for item in results:
         title = item.get("title", "No title available")
         snippet = item.get("snippet", "No description available")
         link = item.get("link", "#")
-        search_summaries.append(
-            f"**{title}**\n{snippet}\n[🔗 View Paper]({link})  [Summarize Paper](command:summarize?link={link})\n"
-        )
-    print(f"DEBUG: Google search results: {search_summaries}")
-    return search_summaries
+        search_results.append({
+            "title": title,
+            "snippet": snippet,
+            "link": link
+        })
+    print(f"DEBUG: Google search results: {search_results}")
+    return search_results
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -136,13 +137,13 @@ def query():
         else:
             return jsonify({"error": "Unknown action"}), 400
 
-    # Summarize Paper Action (initial request)
+    # Summarize Paper Action (initial request) remains the same.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
             print("DEBUG: No paper link provided in request")
             return jsonify({"error": "No paper link provided"}), 400
-        # Send interactive message with Rocket.Chat buttons.
+        # Send interactive message with Rocket.Chat buttons for a single paper.
         interactive_message = {
             "text": "Would you like a summary of the abstract only or a full overview?",
             "attachments": [
@@ -187,11 +188,32 @@ def query():
     classification = classify_query(message)
     if classification == "research":
         search_results = google_search(message, num_results=3)
-        search_info = "\n".join(search_results) if search_results else "No relevant research found."
-        query_with_context = ""
-        for _, text in conversation_history[session_id]:
-            query_with_context += f"{text}\n"
-        query_with_context += f"\nResearch Findings:\n{search_info}"
+        # Build interactive attachments for each search result.
+        interactive_attachments = []
+        for result in search_results:
+            attachment = {
+                "text": f"*{result['title']}*\n{result['snippet']}\n[🔗 View Paper]({result['link']})",
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Abstract Only",
+                        "msg": f"/summarize_abstract {result['link']}",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Full Overview",
+                        "msg": f"/summarize_full {result['link']}",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            }
+            interactive_attachments.append(attachment)
+
+        # Build the query context with previous conversation.
+        query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         research_response = generate(
             model='4o-mini',
             system=(
@@ -208,12 +230,14 @@ def query():
             response_text = research_response.get('response', "").strip()
         else:
             response_text = research_response.strip()
-        summary_heading = "**📚 Brief Summaries of Most Relevant Research Papers:**\n"
-        bot_reply = f"{summary_heading}{response_text}\n\n{search_info}"
+        bot_reply = response_text
+        conversation_history[session_id].append(("bot", bot_reply))
+        if intro_message and len(conversation_history[session_id]) == 2:
+            bot_reply = f"{intro_message}\n\n{bot_reply}"
+        # Return both the bot reply and the interactive attachments for each search result.
+        return jsonify({"text": bot_reply, "attachments": interactive_attachments, "session_id": session_id})
     elif classification == "greeting":
-        query_with_context = ""
-        for _, text in conversation_history[session_id]:
-            query_with_context += f"{text}\n"
+        query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
             model='4o-mini',
             system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
@@ -233,9 +257,7 @@ def query():
             "I'm sorry, but I can only help with research-related queries. Please ask me about research topics or papers."
         )
     else:
-        query_with_context = ""
-        for _, text in conversation_history[session_id]:
-            query_with_context += f"{text}\n"
+        query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
             model='4o-mini',
             system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
@@ -250,9 +272,6 @@ def query():
             response_text = general_response.strip()
         bot_reply = response_text
     conversation_history[session_id].append(("bot", bot_reply))
-    if intro_message and len(conversation_history[session_id]) == 2:
-        bot_reply = f"{intro_message}\n\n{bot_reply}"
-    print(f"DEBUG: Final bot reply: {bot_reply}")
     return jsonify({"text": bot_reply, "session_id": session_id})
 
 def handle_summarization(paper_link, action_type):
