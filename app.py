@@ -46,11 +46,6 @@ def classify_query(message):
     return classification_text
 
 def google_search(query, num_results=3):
-    """
-    Perform a Google Custom Search for research-related PDFs and resources.
-    Enhances the query to target research papers.
-    Returns a list of result objects containing title, snippet, and link.
-    """
     search_query = (
         f"{query} filetype:pdf OR site:researchgate.net OR site:ncbi.nlm.nih.gov OR site:data.gov "
         "OR site:arxiv.org OR site:worldbank.org OR site:europa.eu OR site:sciencedirect.com OR site:scholar.google.com"
@@ -132,7 +127,7 @@ def query():
         action = data.get("action")
         paper_link = data.get("link")
         if action in ["summarize_abstract", "summarize_full"]:
-            return handle_summarization(paper_link, action)
+            return summarizing_llm_agent(paper_link, action)
         else:
             return jsonify({"error": "Unknown action"}), 400
 
@@ -268,12 +263,12 @@ def query():
     conversation_history[session_id].append(("bot", bot_reply))
     return jsonify({"text": bot_reply, "session_id": session_id})
 
-def handle_summarization(paper_link, action_type):
+def summarizing_llm_agent(paper_link, action_type):
     """
-    Helper function to fetch paper text and generate a summary.
-    The action_type determines if we summarize just the abstract or provide a full overview.
+    This function acts as the dedicated summarizing LLM agent.
+    It fetches the paper text, sends a summarization prompt to the LLM, and returns the summary.
     """
-    print(f"DEBUG: Handling summarization for action: {action_type}, link: {paper_link}")
+    print(f"DEBUG: Summarizing LLM Agent triggered for action: {action_type}, link: {paper_link}")
     paper_text = fetch_paper_text(paper_link)
     if not paper_text or len(paper_text.strip()) == 0:
         print("DEBUG: Could not retrieve paper content")
