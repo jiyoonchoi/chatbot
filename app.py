@@ -51,9 +51,8 @@ def google_search(query, num_results=3):
     Perform a Google Custom Search for research-related PDFs and resources.
     Enhances the query to target PDFs or select research domains.
     Returns a list of formatted markdown strings with 'View Paper' and
-    'Summarize Paper' buttons that use a standard HTTP URL.
+    'Summarize Paper' buttons.
     """
-    # Enhance query to target research papers.
     search_query = (
         f"{query} filetype:pdf OR site:researchgate.net OR site:ncbi.nlm.nih.gov OR site:data.gov "
         "OR site:arxiv.org OR site:worldbank.org OR site:europa.eu OR site:sciencedirect.com OR site:scholar.google.com"
@@ -72,7 +71,7 @@ def google_search(query, num_results=3):
         snippet = item.get("snippet", "No description available")
         link = item.get("link", "#")
         search_summaries.append(
-            f"**{title}**\n{snippet}\n[🔗 View Paper]({link})  [Summarize Paper](http://localhost:5000/query?action=summarize&link={link}))\n"
+            f"**{title}**\n{snippet}\n[🔗 View Paper]({link})  [Summarize Paper](command:summarize?link={link})\n"
         )
     print(f"DEBUG: Google search results: {search_summaries}")
     return search_summaries
@@ -128,50 +127,49 @@ def query():
     data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
 
-    # Summarize Paper Action
+    # Handle interactive callback from Rocket.Chat button presses.
+    if data.get("interactive_callback"):
+        action = data.get("action")
+        paper_link = data.get("link")
+        if action in ["summarize_abstract", "summarize_full"]:
+            return handle_summarization(paper_link, action)
+        else:
+            return jsonify({"error": "Unknown action"}), 400
+
+    # Summarize Paper Action (initial request)
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
             print("DEBUG: No paper link provided in request")
             return jsonify({"error": "No paper link provided"}), 400
-        print(f"DEBUG: Summarize action requested for link: {paper_link}")
-        print("DEBUG: Summarization process started...")
-        paper_text = fetch_paper_text(paper_link)
-        if not paper_text or len(paper_text.strip()) == 0:
-            print("DEBUG: Could not retrieve paper content")
-            return jsonify({"error": "Could not retrieve paper content"}), 400
-        excerpt = paper_text[:3000]
-        print(f"DEBUG: Excerpt for summarization (first 3000 chars): {excerpt[:200]}...")
-        summary_prompt = (
-            f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
-        )
-        print("DEBUG: Sending summarization prompt to LLM")
-        summary_response = generate(
-            model='4o-mini',
-            system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
-            query=summary_prompt,
-            temperature=0.0,
-            lastk=0,
-            session_id="summarize_" + str(uuid.uuid4())
-        )
-        if isinstance(summary_response, dict):
-            summary_text = summary_response.get('response', '').strip()
-        else:
-            summary_text = summary_response.strip()
-        print(f"DEBUG: Received summary text: {summary_text[:300]}...")
-        # Generate PDF in memory using FPDF.
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.multi_cell(0, 10, summary_text)
-        pdf_output = pdf.output(dest="S").encode("latin1")
-        pdf_buffer = io.BytesIO(pdf_output)
-        pdf_buffer.seek(0)
-        print("DEBUG: PDF generated in memory, ready for download")
-        # Force download by setting Content-Disposition header.
-        return send_file(pdf_buffer, as_attachment=True, download_name="Paper_Summary.pdf", mimetype='application/pdf')
+        # Send interactive message with Rocket.Chat buttons.
+        interactive_message = {
+            "text": "Would you like a summary of the abstract only or a full overview?",
+            "attachments": [
+                {
+                    "actions": [
+                        {
+                            "type": "button",
+                            "text": "Abstract Only",
+                            "msg": f"/summarize_abstract {paper_link}",
+                            "msg_in_chat_window": True,
+                            "msg_processing_type": "sendMessage"
+                        },
+                        {
+                            "type": "button",
+                            "text": "Full Overview",
+                            "msg": f"/summarize_full {paper_link}",
+                            "msg_in_chat_window": True,
+                            "msg_processing_type": "sendMessage"
+                        }
+                    ]
+                }
+            ]
+        }
+        print("DEBUG: Returning interactive button message")
+        return jsonify(interactive_message)
 
-    # Research Query Action
+    # Conversation handling for research queries, greetings, etc.
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     message = data.get("text", "")
@@ -256,6 +254,53 @@ def query():
         bot_reply = f"{intro_message}\n\n{bot_reply}"
     print(f"DEBUG: Final bot reply: {bot_reply}")
     return jsonify({"text": bot_reply, "session_id": session_id})
+
+def handle_summarization(paper_link, action_type):
+    """
+    Helper function to fetch paper text and generate a summary.
+    The action_type determines if we summarize just the abstract or provide a full overview.
+    """
+    print(f"DEBUG: Handling summarization for action: {action_type}, link: {paper_link}")
+    paper_text = fetch_paper_text(paper_link)
+    if not paper_text or len(paper_text.strip()) == 0:
+        print("DEBUG: Could not retrieve paper content")
+        return jsonify({"error": "Could not retrieve paper content"}), 400
+
+    excerpt = paper_text[:3000]
+    if action_type == "summarize_abstract":
+        summary_prompt = (
+            f"Please provide a detailed summary focusing on the abstract of the following research paper text:\n\n{excerpt}"
+        )
+    else:  # summarize_full
+        summary_prompt = (
+            f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
+        )
+
+    print("DEBUG: Sending summarization prompt to LLM")
+    summary_response = generate(
+        model='4o-mini',
+        system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
+        query=summary_prompt,
+        temperature=0.0,
+        lastk=0,
+        session_id="summarize_" + str(uuid.uuid4())
+    )
+    if isinstance(summary_response, dict):
+        summary_text = summary_response.get('response', '').strip()
+    else:
+        summary_text = summary_response.strip()
+
+    print(f"DEBUG: Received summary text: {summary_text[:300]}...")
+    # Generate PDF in memory using FPDF.
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, summary_text)
+    pdf_output = pdf.output(dest="S").encode("latin1")
+    pdf_buffer = io.BytesIO(pdf_output)
+    pdf_buffer.seek(0)
+    print("DEBUG: PDF generated in memory, ready for download")
+    return send_file(pdf_buffer, as_attachment=True, download_name="Paper_Summary.pdf", mimetype='application/pdf')
 
 @app.errorhandler(404)
 def page_not_found(e):
