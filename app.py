@@ -37,7 +37,7 @@ def upload_pdf_if_needed(pdf_path, session_id):
     print(f"DEBUG: Upload response: {response}")
     return "Successfully uploaded" in response
 
-def generate_pdf_response(prompt, session_id):
+def generate_summary_response(prompt, session_id):
     """
     Calls generate with the given prompt and session_id.
     """
@@ -80,7 +80,7 @@ def summarizing_agent(action_type, session_id):
     
     # Wait 10 seconds for the PDF to be fully processed
     time.sleep(10)
-    return generate_pdf_response(prompt, session_id)
+    return generate_summary_response(prompt, session_id)
 
 def answer_question(question, session_id):
     """
@@ -96,7 +96,7 @@ def answer_question(question, session_id):
     )
     # Wait 10 seconds to ensure the PDF is processed.
     time.sleep(10)
-    return generate_pdf_response(prompt, session_id)
+    return generate_summary_response(prompt, session_id)
 
 def classify_query(message):
     """
@@ -126,9 +126,11 @@ def classify_query(message):
 
 # Button action handlers.
 def handle_summarize_abstract(session_id):
+    print(f"DEBUG: Summarizing abstract for session {session_id}")
     return summarizing_agent("summarize_abstract", session_id)
 
 def handle_summarize_full(session_id):
+    print(f"DEBUG: Summarizing full paper for session {session_id}")
     return summarizing_agent("summarize_full", session_id)
 
 def build_interactive_response(text, session_id):
@@ -177,11 +179,16 @@ def query():
         # You could optionally send this message to the client immediately.
         # Now process the button action.
         if action == "summarize_abstract":
+            print(f"DEBUG: User requested abstract summary for session {session_id}")
             summary_text = handle_summarize_abstract(session_id)
         elif action == "summarize_full":
+            print(f"DEBUG: User requested full paper summary for session {session_id}")
             summary_text = handle_summarize_full(session_id)
         else:
+            print(f"DEBUG: Unknown action requested: {action}")
             summary_text = "Unknown action."
+
+        print(f"DEBUG: Summary response: {summary_text}")
         conversation_history.setdefault(session_id, []).append(("bot", summary_text))
         return jsonify(build_interactive_response(summary_text, session_id))
     
@@ -207,7 +214,7 @@ def query():
         concise_prompt = (
             "Based solely on the research paper that was uploaded in this session, please provide a concise 1-2 sentence summary."
         )
-        concise_summary = generate_pdf_response(concise_prompt, session_id)
+        concise_summary = generate_summary_response(concise_prompt, session_id)
         conversation_history.setdefault(session_id, []).append(("bot", concise_summary))
         summary_text = (
             f"Weekly Reading Summary: {concise_summary}\n\n"
