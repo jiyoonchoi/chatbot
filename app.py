@@ -98,7 +98,6 @@ def fetch_paper_text(link):
         return paper_text
     soup = BeautifulSoup(response.content, "html.parser")
     print(f"DEBUG: Fetched HTML snippet: {soup.get_text()[:300]}")
-    # Try to locate a PDF link within the page.
     pdf_anchor = soup.find("a", href=lambda href: href and ".pdf" in href.lower())
     if pdf_anchor:
         pdf_link = urljoin(link, pdf_anchor.get("href"))
@@ -120,9 +119,8 @@ def fetch_paper_text(link):
 
 def summarizing_llm_agent(paper_link, action_type):
     """
-    Dedicated summarizing agent.
-    It fetches the paper text, creates a summarization prompt based on the requested type,
-    sends the prompt to the LLM, and returns the summary.
+    This function acts as the dedicated summarizing LLM agent.
+    It fetches the paper text, sends a summarization prompt to the LLM, and returns the summary.
     """
     print(f"DEBUG: Summarizing LLM Agent triggered for action: {action_type}, link: {paper_link}")
     paper_text = fetch_paper_text(paper_link)
@@ -130,13 +128,12 @@ def summarizing_llm_agent(paper_link, action_type):
         print("DEBUG: Could not retrieve paper content")
         return jsonify({"error": "Could not retrieve paper content"}), 400
 
-    # Use an excerpt (first 3000 characters) to keep prompt size manageable.
     excerpt = paper_text[:3000]
     if action_type == "summarize_abstract":
         summary_prompt = (
             f"Please provide a detailed summary focusing on the abstract of the following research paper text:\n\n{excerpt}"
         )
-    else:  # action_type == "summarize_full"
+    else:  # summarize_full
         summary_prompt = (
             f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
         )
@@ -162,16 +159,15 @@ def query():
     data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
 
-    # Handle commands triggered by buttons (or direct slash commands).
+    # If the message text itself starts with a summarization command, handle it immediately.
     message = data.get("text", "")
     if message.startswith("/summarize_abstract") or message.startswith("/summarize_full"):
         parts = message.split()
-        action = parts[0][1:]  # Remove leading slash
+        action = parts[0][1:]  # remove the leading slash
         paper_link = " ".join(parts[1:])
         return summarizing_llm_agent(paper_link, action)
 
-    # Handle interactive callbacks from Rocket.Chat action buttons.
-    # (If using Rocket.Chat’s Apps-Engine, the payload structure might differ.)
+    # Handle interactive callback from Rocket.Chat button presses.
     if data.get("interactive_callback"):
         action = data.get("action")
         paper_link = data.get("link")
@@ -180,7 +176,41 @@ def query():
         else:
             return jsonify({"error": "Unknown action"}), 400
 
-    # Handle research queries.
+    # The following block for the "Summarize Paper" button has been commented out.
+    # When a user clicks "Summarize Paper", the interactive message with two buttons is not returned.
+    #
+    # if data.get("action", "").lower() == "summarize":
+    #     paper_link = data.get("link")
+    #     if not paper_link:
+    #         print("DEBUG: No paper link provided in request")
+    #         return jsonify({"error": "No paper link provided"}), 400
+    #     interactive_message = {
+    #         "text": "Would you like a summary of the abstract only or a full overview?",
+    #         "attachments": [
+    #             {
+    #                 "actions": [
+    #                     {
+    #                         "type": "button",
+    #                         "text": "Abstract Only",
+    #                         "msg": f"/summarize_abstract {paper_link}",
+    #                         "msg_in_chat_window": True,
+    #                         "msg_processing_type": "sendMessage"
+    #                     },
+    #                     {
+    #                         "type": "button",
+    #                         "text": "Full Overview",
+    #                         "msg": f"/summarize_full {paper_link}",
+    #                         "msg_in_chat_window": True,
+    #                         "msg_processing_type": "sendMessage"
+    #                     }
+    #                 ]
+    #             }
+    #         ]
+    #     }
+    #     print("DEBUG: Returning interactive button message")
+    #     return jsonify(interactive_message)
+
+    # Handle general conversation queries.
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     if data.get("bot") or not message:
@@ -199,11 +229,8 @@ def query():
         search_results = google_search(message, num_results=3)
         interactive_attachments = []
         for result in search_results:
-            # Build an attachment following Rocket.Chat’s interactive message guidelines.
             attachment = {
                 "text": f"*{result['title']}*\n{result['snippet']}\n[🔗 View Paper]({result['link']})",
-                "attachment_type": "default",       # Required for Rocket.Chat interactive attachments
-                "callback_id": "research_summary",    # Used to identify the callback context
                 "actions": [
                     {
                         "type": "button",
@@ -243,11 +270,7 @@ def query():
         conversation_history[session_id].append(("bot", bot_reply))
         if intro_message and len(conversation_history[session_id]) == 2:
             bot_reply = f"{intro_message}\n\n{bot_reply}"
-        return jsonify({
-            "text": bot_reply,
-            "attachments": interactive_attachments,
-            "session_id": session_id
-        })
+        return jsonify({"text": bot_reply, "attachments": interactive_attachments, "session_id": session_id})
     elif classification == "greeting":
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
