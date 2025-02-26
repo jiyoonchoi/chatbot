@@ -137,13 +137,13 @@ def query():
         else:
             return jsonify({"error": "Unknown action"}), 400
 
-    # Summarize Paper Action (initial request) remains the same.
+    # When a user clicks "Summarize Paper" we trigger the interactive message.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
             print("DEBUG: No paper link provided in request")
             return jsonify({"error": "No paper link provided"}), 400
-        # Send interactive message with Rocket.Chat buttons for a single paper.
+        # Return an interactive message with two buttons rather than a markdown link.
         interactive_message = {
             "text": "Would you like a summary of the abstract only or a full overview?",
             "attachments": [
