@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # PDF to be processed (the reading for this week)
-PDF_PATH = "research_paper.pdf"
+PDF_PATH = "WebServer/research_paper.pdf"
 
 app = Flask(__name__)
 
