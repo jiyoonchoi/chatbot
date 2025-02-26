@@ -43,7 +43,7 @@ def summarizing_agent(pdf_path, action_type):
     """
     Extracts text from the given PDF and performs a detailed summarization based
     on the action_type: either 'summarize_abstract' or 'summarize_full'.
-    The prompts include the context for CS-150: Generative AI for Impact.
+    The prompts include the context for CS-150: Generative AI for Social Impact.
     Uses the entire PDF text for summarization.
     """
     pdf_text = extract_text_from_pdf(pdf_path)
@@ -52,18 +52,18 @@ def summarizing_agent(pdf_path, action_type):
     
     if action_type == "summarize_abstract":
         summary_prompt = (
-            f"Please provide a detailed summary focusing on the abstract of the reading for this week of CS-150: Generative AI for Impact based on the following paper text:\n\n{pdf_text}"
+            f"Please provide a detailed summary focusing on the abstract of the reading for this week of CS-150: Generative AI for Social Impact based on the following paper text:\n\n{pdf_text}"
         )
     elif action_type == "summarize_full":
         summary_prompt = (
-            f"Please provide a detailed summary of the reading for this week of CS-150: Generative AI for Impact based on the following paper text, including key findings, methodology, and conclusions:\n\n{pdf_text}"
+            f"Please provide a detailed summary of the full reading for this week of CS-150: Generative AI for Social Impact based on the following paper text, including key findings, methodology, and conclusions:\n\n{pdf_text}"
         )
     else:
         return "Invalid summarization action."
     
     summary_response = generate(
         model='4o-mini',
-        system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
+        system="You are a TA chatbot for the Tufts course called CS-150: Generative AI for Social Impact. Your task is to be an expert on the reading for this week.",
         query=summary_prompt,
         temperature=0.0,
         lastk=0,
@@ -78,9 +78,13 @@ def summarizing_agent(pdf_path, action_type):
     return summary_text
 
 # LLM AGENT: Classify the query.
-def classify_query(message):
+def classify_query(pdf_path, message):
+    pdf_text = extract_text_from_pdf(pdf_path)
+    if not pdf_text.strip():
+        return "Could not extract text from the provided PDF."
+    
     prompt = (
-        f"Determine if the following message is a greeting, a research query, or something else. "
+        f"Determine if the following message is a greeting, a query about this week's research paper (\n\n{pdf_text}), or something else. "
         f"Reply with just one word: 'greeting' if it's a simple greeting, 'research' if it's asking "
         f"for research-related information, or 'other' if it is unrelated to research. "
         f"Message: \"{message}\""
@@ -133,7 +137,7 @@ def query():
     # Initialize conversation history with an intro message if needed.
     if session_id not in conversation_history:
         intro_message = (
-            "Hello! I am your friendly TA for CS-150: Generative AI for Impact. "
+            "Hello! I am your friendly TA for CS-150: Generative AI for Social Impact. "
             "Let's review this week's reading."
         )
         conversation_history[session_id] = [("bot", intro_message)]
@@ -141,7 +145,7 @@ def query():
         intro_message = None
     conversation_history[session_id].append(("user", message))
 
-    classification = classify_query(message)
+    classification = classify_query(PDF_PATH, message)
 
     if classification == "research":
         # Use the provided PDF path if available, otherwise fall back to the global PDF_PATH.
@@ -159,11 +163,11 @@ def query():
             return jsonify({"error": error_msg}), 400
 
         summary_prompt = (
-            f"Please provide a concise 1-2 sentence summary of the reading for this week of CS-150: Generative AI for Impact based on the following paper text:\n\n{pdf_text}"
+            f"Please provide a concise 1-2 sentence summary of the reading for this week of CS-150: Generative AI for Social Impact based on the following paper text:\n\n{pdf_text}"
         )
         concise_summary_response = generate(
             model='4o-mini',
-            system="You are an academic summarizer. Provide a concise 1-2 sentence summary of the weekly reading.",
+            system="You are a TA chatbot for the Tufts course called CS-150: Generative AI for Social Impact. Your task is to be an expert on the reading for this week.",
             query=summary_prompt,
             temperature=0.0,
             lastk=0,
@@ -214,7 +218,7 @@ def query():
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
             model='4o-mini',
-            system="You are a friendly TA chatbot for CS-150: Generative AI for Impact. Please prompt the user with the weekly reading summary.",
+            system="You are a friendly TA chatbot for CS-150: Generative AI for Social Impact. Please prompt the user with the weekly reading summary.",
             query=query_with_context,
             temperature=0.5,
             lastk=0,
@@ -227,14 +231,14 @@ def query():
         bot_reply = response_text
     elif classification == "other":
         bot_reply = (
-            "I'm the TA for CS-150: Generative AI for Impact. I can help you with this week's reading. "
+            "I'm the TA for CS-150: Generative AI for Social Impact. I can help you with this week's reading. "
             "Please ask me about the reading or request a summary."
         )
     else:
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
             model='4o-mini',
-            system="You are a friendly TA chatbot for CS-150: Generative AI for Impact. Please assist the student with questions about the weekly reading.",
+            system="You are a friendly TA chatbot for CS-150: Generative AI for Social Impact. Please assist the student with questions about the weekly reading.",
             query=query_with_context,
             temperature=0.5,
             lastk=0,
