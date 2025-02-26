@@ -228,29 +228,10 @@ def query():
     classification = classify_query(message)
     if classification == "research":
         search_results = google_search(message, num_results=3)
-        # The interactive attachments with "Summarize Paper" buttons are hidden for now.
-        # interactive_attachments = []
-        # for result in search_results:
-        #     attachment = {
-        #         "text": f"*{result['title']}*\n{result['snippet']}\n[🔗 View Paper]({result['link']})",
-        #         "actions": [
-        #             {
-        #                 "type": "button",
-        #                 "text": "Abstract Only",
-        #                 "msg": f"/summarize_abstract {result['link']}",
-        #                 "msg_in_chat_window": True,
-        #                 "msg_processing_type": "sendMessage"
-        #             },
-        #             {
-        #                 "type": "button",
-        #                 "text": "Full Overview",
-        #                 "msg": f"/summarize_full {result['link']}",
-        #                 "msg_in_chat_window": True,
-        #                 "msg_processing_type": "sendMessage"
-        #             }
-        #         ]
-        #     }
-        #     interactive_attachments.append(attachment)
+        # Although the interactive buttons are hidden, we still include the paper links in the text response.
+        results_text = ""
+        for result in search_results:
+            results_text += f"\n\n*{result['title']}*\n{result['snippet']}\n[🔗 View Paper]({result['link']})"
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         research_response = generate(
             model='4o-mini',
@@ -272,6 +253,8 @@ def query():
         conversation_history[session_id].append(("bot", bot_reply))
         if intro_message and len(conversation_history[session_id]) == 2:
             bot_reply = f"{intro_message}\n\n{bot_reply}"
+        # Append the paper links to the final reply.
+        bot_reply += "\n\nHere are some papers I found:" + results_text
         return jsonify({"text": bot_reply, "session_id": session_id})
     elif classification == "greeting":
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
