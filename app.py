@@ -162,15 +162,16 @@ def query():
     data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
 
-    # Check if the message is a summarization command (triggered by button click or direct command).
+    # Handle commands triggered by buttons (or direct slash commands).
     message = data.get("text", "")
     if message.startswith("/summarize_abstract") or message.startswith("/summarize_full"):
         parts = message.split()
-        action = parts[0][1:]
+        action = parts[0][1:]  # Remove leading slash
         paper_link = " ".join(parts[1:])
         return summarizing_llm_agent(paper_link, action)
 
-    # Handle interactive callbacks from button clicks.
+    # Handle interactive callbacks from Rocket.Chat action buttons.
+    # (If using Rocket.Chat’s Apps-Engine, the payload structure might differ.)
     if data.get("interactive_callback"):
         action = data.get("action")
         paper_link = data.get("link")
@@ -198,8 +199,11 @@ def query():
         search_results = google_search(message, num_results=3)
         interactive_attachments = []
         for result in search_results:
+            # Build an attachment following Rocket.Chat’s interactive message guidelines.
             attachment = {
                 "text": f"*{result['title']}*\n{result['snippet']}\n[🔗 View Paper]({result['link']})",
+                "attachment_type": "default",       # Required for Rocket.Chat interactive attachments
+                "callback_id": "research_summary",    # Used to identify the callback context
                 "actions": [
                     {
                         "type": "button",
@@ -239,7 +243,11 @@ def query():
         conversation_history[session_id].append(("bot", bot_reply))
         if intro_message and len(conversation_history[session_id]) == 2:
             bot_reply = f"{intro_message}\n\n{bot_reply}"
-        return jsonify({"text": bot_reply, "attachments": interactive_attachments, "session_id": session_id})
+        return jsonify({
+            "text": bot_reply,
+            "attachments": interactive_attachments,
+            "session_id": session_id
+        })
     elif classification == "greeting":
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
