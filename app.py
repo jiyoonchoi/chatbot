@@ -71,88 +71,88 @@ def google_search(query, num_results=3):
     print(f"DEBUG: Google search results: {search_results}")
     return search_results
 
-def extract_text_from_pdf(pdf_path):
-    text = ""
-    try:
-        with open(pdf_path, "rb") as f:
-            pdf_reader = PyPDF2.PdfReader(f)
-            for page in pdf_reader.pages:
-                page_text = page.extract_text() or ""
-                text += page_text + "\n"
-        print(f"DEBUG: Extracted text from PDF at {pdf_path}")
-    except Exception as e:
-        print(f"DEBUG: Error reading PDF: {e}")
-    return text
+# def extract_text_from_pdf(pdf_path):
+#     text = ""
+#     try:
+#         with open(pdf_path, "rb") as f:
+#             pdf_reader = PyPDF2.PdfReader(f)
+#             for page in pdf_reader.pages:
+#                 page_text = page.extract_text() or ""
+#                 text += page_text + "\n"
+#         print(f"DEBUG: Extracted text from PDF at {pdf_path}")
+#     except Exception as e:
+#         print(f"DEBUG: Error reading PDF: {e}")
+#     return text
 
-def fetch_paper_text(link):
-    paper_text = ""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/98.0.4758.102 Safari/537.36"
-    }
-    print(f"DEBUG: Fetching paper text from URL: {link}")
-    response = requests.get(link, headers=headers)
-    if response.status_code != 200:
-        print(f"DEBUG: Error fetching URL: {link} - Status code: {response.status_code}")
-        return paper_text
-    soup = BeautifulSoup(response.content, "html.parser")
-    print(f"DEBUG: Fetched HTML snippet: {soup.get_text()[:300]}")
-    pdf_anchor = soup.find("a", href=lambda href: href and ".pdf" in href.lower())
-    if pdf_anchor:
-        pdf_link = urljoin(link, pdf_anchor.get("href"))
-        print(f"DEBUG: Found PDF link: {pdf_link}")
-        pdf_response = requests.get(pdf_link, headers=headers)
-        if pdf_response.status_code == 200:
-            temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            with open(temp_pdf.name, "wb") as f:
-                f.write(pdf_response.content)
-            print(f"DEBUG: Downloaded PDF to temporary file: {temp_pdf.name}")
-            paper_text = extract_text_from_pdf(temp_pdf.name)
-        else:
-            print(f"DEBUG: Error fetching PDF link: {pdf_link} - Status code: {pdf_response.status_code}")
-    else:
-        print("DEBUG: No PDF link found; using HTML text")
-        paper_text = soup.get_text(separator="\n")
-    print(f"DEBUG: Retrieved paper text length: {len(paper_text)} characters")
-    return paper_text
+# def fetch_paper_text(link):
+#     paper_text = ""
+#     headers = {
+#         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+#                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+#                       "Chrome/98.0.4758.102 Safari/537.36"
+#     }
+#     print(f"DEBUG: Fetching paper text from URL: {link}")
+#     response = requests.get(link, headers=headers)
+#     if response.status_code != 200:
+#         print(f"DEBUG: Error fetching URL: {link} - Status code: {response.status_code}")
+#         return paper_text
+#     soup = BeautifulSoup(response.content, "html.parser")
+#     print(f"DEBUG: Fetched HTML snippet: {soup.get_text()[:300]}")
+#     pdf_anchor = soup.find("a", href=lambda href: href and ".pdf" in href.lower())
+#     if pdf_anchor:
+#         pdf_link = urljoin(link, pdf_anchor.get("href"))
+#         print(f"DEBUG: Found PDF link: {pdf_link}")
+#         pdf_response = requests.get(pdf_link, headers=headers)
+#         if pdf_response.status_code == 200:
+#             temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+#             with open(temp_pdf.name, "wb") as f:
+#                 f.write(pdf_response.content)
+#             print(f"DEBUG: Downloaded PDF to temporary file: {temp_pdf.name}")
+#             paper_text = extract_text_from_pdf(temp_pdf.name)
+#         else:
+#             print(f"DEBUG: Error fetching PDF link: {pdf_link} - Status code: {pdf_response.status_code}")
+#     else:
+#         print("DEBUG: No PDF link found; using HTML text")
+#         paper_text = soup.get_text(separator="\n")
+#     print(f"DEBUG: Retrieved paper text length: {len(paper_text)} characters")
+#     return paper_text
 
-def summarizing_llm_agent(paper_link, action_type):
-    """
-    This function acts as the dedicated summarizing LLM agent.
-    It fetches the paper text, sends a summarization prompt to the LLM, and returns the summary.
-    """
-    print(f"DEBUG: Summarizing LLM Agent triggered for action: {action_type}, link: {paper_link}")
-    paper_text = fetch_paper_text(paper_link)
-    if not paper_text or len(paper_text.strip()) == 0:
-        print("DEBUG: Could not retrieve paper content")
-        return jsonify({"error": "Could not retrieve paper content"}), 400
+# def summarizing_llm_agent(paper_link, action_type):
+#     """
+#     This function acts as the dedicated summarizing LLM agent.
+#     It fetches the paper text, sends a summarization prompt to the LLM, and returns the summary.
+#     """
+#     print(f"DEBUG: Summarizing LLM Agent triggered for action: {action_type}, link: {paper_link}")
+#     paper_text = fetch_paper_text(paper_link)
+#     if not paper_text or len(paper_text.strip()) == 0:
+#         print("DEBUG: Could not retrieve paper content")
+#         return jsonify({"error": "Could not retrieve paper content"}), 400
 
-    excerpt = paper_text[:3000]
-    if action_type == "summarize_abstract":
-        summary_prompt = (
-            f"Please provide a detailed summary focusing on the abstract of the following research paper text:\n\n{excerpt}"
-        )
-    else:  # summarize_full
-        summary_prompt = (
-            f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
-        )
+#     excerpt = paper_text[:3000]
+#     if action_type == "summarize_abstract":
+#         summary_prompt = (
+#             f"Please provide a detailed summary focusing on the abstract of the following research paper text:\n\n{excerpt}"
+#         )
+#     else:  # summarize_full
+#         summary_prompt = (
+#             f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
+#         )
 
-    print("DEBUG: Sending summarization prompt to LLM")
-    summary_response = generate(
-        model='4o-mini',
-        system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
-        query=summary_prompt,
-        temperature=0.0,
-        lastk=0,
-        session_id="summarize_" + str(uuid.uuid4())
-    )
-    if isinstance(summary_response, dict):
-        summary_text = summary_response.get('response', '').strip()
-    else:
-        summary_text = summary_response.strip()
-    print(f"DEBUG: Received summary text: {summary_text[:300]}...")
-    return jsonify({"text": summary_text})
+#     print("DEBUG: Sending summarization prompt to LLM")
+#     summary_response = generate(
+#         model='4o-mini',
+#         system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
+#         query=summary_prompt,
+#         temperature=0.0,
+#         lastk=0,
+#         session_id="summarize_" + str(uuid.uuid4())
+#     )
+#     if isinstance(summary_response, dict):
+#         summary_text = summary_response.get('response', '').strip()
+#     else:
+#         summary_text = summary_response.strip()
+#     print(f"DEBUG: Received summary text: {summary_text[:300]}...")
+#     return jsonify({"text": summary_text})
 
 @app.route('/query', methods=['POST'])
 def query():
@@ -161,11 +161,11 @@ def query():
 
     # If the message text itself starts with a summarization command, handle it immediately.
     message = data.get("text", "")
-    if message.startswith("/summarize_abstract") or message.startswith("/summarize_full"):
-        parts = message.split()
-        action = parts[0][1:]  # remove the leading slash
-        paper_link = " ".join(parts[1:])
-        return summarizing_llm_agent(paper_link, action)
+    # if message.startswith("/summarize_abstract") or message.startswith("/summarize_full"):
+    #     parts = message.split()
+    #     action = parts[0][1:]  # remove the leading slash
+    #     paper_link = " ".join(parts[1:])
+    #     return summarizing_llm_agent(paper_link, action)
 
     # Handle interactive callback from Rocket.Chat button presses.
     # The following block is commented out to hide the "Summarize Paper" feature for now.
@@ -236,13 +236,15 @@ def query():
         research_response = generate(
             model='4o-mini',
             system=(
-                "You are a Research Assistant AI that specializes in retrieving and summarizing "
-                "academic research, datasets, and scientific studies. Provide well-cited, fact-based insights "
-                "from reputable sources. If the query is general chat, respond as a friendly assistant."
+                "You are a Research Assistant AI that specializes in retrieving academic "
+                "research, datasets, and scientific studies. You will provide a brief summary "
+                "of each paper and a link to the paper. You will provide follow up answers "
+                "from the papers you find based on the user's follow up questions while citing "
+                "the paper. You will also provide a link to the paper."
             ),
             query=query_with_context,
             temperature=0.0,
-            lastk=0,
+            lastk=256,
             session_id=session_id
         )
         if isinstance(research_response, dict):
