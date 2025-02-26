@@ -117,10 +117,55 @@ def fetch_paper_text(link):
     print(f"DEBUG: Retrieved paper text length: {len(paper_text)} characters")
     return paper_text
 
+def summarizing_llm_agent(paper_link, action_type):
+    """
+    This function acts as the dedicated summarizing LLM agent.
+    It fetches the paper text, sends a summarization prompt to the LLM, and returns the summary.
+    """
+    print(f"DEBUG: Summarizing LLM Agent triggered for action: {action_type}, link: {paper_link}")
+    paper_text = fetch_paper_text(paper_link)
+    if not paper_text or len(paper_text.strip()) == 0:
+        print("DEBUG: Could not retrieve paper content")
+        return jsonify({"error": "Could not retrieve paper content"}), 400
+
+    excerpt = paper_text[:3000]
+    if action_type == "summarize_abstract":
+        summary_prompt = (
+            f"Please provide a detailed summary focusing on the abstract of the following research paper text:\n\n{excerpt}"
+        )
+    else:  # summarize_full
+        summary_prompt = (
+            f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
+        )
+
+    print("DEBUG: Sending summarization prompt to LLM")
+    summary_response = generate(
+        model='4o-mini',
+        system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
+        query=summary_prompt,
+        temperature=0.0,
+        lastk=0,
+        session_id="summarize_" + str(uuid.uuid4())
+    )
+    if isinstance(summary_response, dict):
+        summary_text = summary_response.get('response', '').strip()
+    else:
+        summary_text = summary_response.strip()
+    print(f"DEBUG: Received summary text: {summary_text[:300]}...")
+    return jsonify({"text": summary_text})
+
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
+
+    # If the message text itself starts with a summarization command, handle it immediately.
+    message = data.get("text", "")
+    if message.startswith("/summarize_abstract") or message.startswith("/summarize_full"):
+        parts = message.split()
+        action = parts[0][1:]  # remove the leading slash
+        paper_link = " ".join(parts[1:])
+        return summarizing_llm_agent(paper_link, action)
 
     # Handle interactive callback from Rocket.Chat button presses.
     if data.get("interactive_callback"):
@@ -166,7 +211,6 @@ def query():
     # Handle general conversation queries.
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
-    message = data.get("text", "")
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
     if session_id not in conversation_history:
@@ -262,45 +306,6 @@ def query():
         bot_reply = response_text
     conversation_history[session_id].append(("bot", bot_reply))
     return jsonify({"text": bot_reply, "session_id": session_id})
-
-def summarizing_llm_agent(paper_link, action_type):
-    """
-    This function acts as the dedicated summarizing LLM agent.
-    It fetches the paper text, sends a summarization prompt to the LLM, and returns the summary.
-    """
-    print(f"DEBUG: Summarizing LLM Agent triggered for action: {action_type}, link: {paper_link}")
-    paper_text = fetch_paper_text(paper_link)
-    if not paper_text or len(paper_text.strip()) == 0:
-        print("DEBUG: Could not retrieve paper content")
-        return jsonify({"error": "Could not retrieve paper content"}), 400
-
-    excerpt = paper_text[:3000]
-    if action_type == "summarize_abstract":
-        summary_prompt = (
-            f"Please provide a detailed summary focusing on the abstract of the following research paper text:\n\n{excerpt}"
-        )
-    else:  # summarize_full
-        summary_prompt = (
-            f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
-        )
-
-    print("DEBUG: Sending summarization prompt to LLM")
-    summary_response = generate(
-        model='4o-mini',
-        system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
-        query=summary_prompt,
-        temperature=0.0,
-        lastk=0,
-        session_id="summarize_" + str(uuid.uuid4())
-    )
-    if isinstance(summary_response, dict):
-        summary_text = summary_response.get('response', '').strip()
-    else:
-        summary_text = summary_response.strip()
-
-    print(f"DEBUG: Received summary text: {summary_text[:300]}...")
-    # Instead of generating a PDF, return the summary text as a new bot message.
-    return jsonify({"text": summary_text})
 
 @app.errorhandler(404)
 def page_not_found(e):
