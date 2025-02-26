@@ -247,16 +247,18 @@ def query():
                         {
                             "type": "button",
                             "text": "Abstract Only",
-                            "msg": f"/summarize_abstract {paper_link}",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
+                            "action": "summarize_abstract",  # new key instead of 'msg'
+                            "link": paper_link,             # provide the paper link
+                            "msg_in_chat_window": True,    # do not show command in chat
+                            "msg_processing_type": "interactive_callback"  # trigger callback
                         },
                         {
                             "type": "button",
                             "text": "Full Overview",
-                            "msg": f"/summarize_full {paper_link}",
+                            "action": "summarize_full",
+                            "link": paper_link,
                             "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
+                            "msg_processing_type": "interactive_callback"
                         }
                     ]
                 }
@@ -289,16 +291,18 @@ def query():
                     {
                         "type": "button",
                         "text": "Abstract Only",
-                        "msg": f"/summarize_abstract {result['link']}",
+                        "action": "summarize_abstract",
+                        "link": result['link'],
                         "msg_in_chat_window": False,
-                        "msg_processing_type": "sendMessage"
+                        "msg_processing_type": "interactive_callback"
                     },
                     {
                         "type": "button",
                         "text": "Full Overview",
-                        "msg": f"/summarize_full {result['link']}",
+                        "action": "summarize_full",
+                        "link": result['link'],
                         "msg_in_chat_window": False,
-                        "msg_processing_type": "sendMessage"
+                        "msg_processing_type": "interactive_callback"
                     }
                 ]
             }
