@@ -131,6 +131,35 @@ def handle_summarize_abstract(session_id):
 def handle_summarize_full(session_id):
     return summarizing_agent("summarize_full", session_id)
 
+def build_interactive_response(text, session_id):
+    """
+    Helper to build a response payload with persistent interactive buttons.
+    """
+    return {
+        "text": text,
+        "session_id": session_id,
+        "attachments": [
+            {
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Summarize Abstract",
+                        "action": "summarize_abstract",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Summarize Full Paper",
+                        "action": "summarize_full",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            }
+        ]
+    }
+
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
@@ -140,14 +169,21 @@ def query():
     # If an "action" key is present (i.e. a button press), handle it directly.
     action = data.get("action")
     if action:
+        # Log the button click.
+        print(f"DEBUG: Interactive button clicked: {action}")
+        # Inform the user that processing has started.
+        processing_msg = "Processing summary, please wait..."
+        conversation_history.setdefault(session_id, []).append(("bot", processing_msg))
+        # You could optionally send this message to the client immediately.
+        # Now process the button action.
         if action == "summarize_abstract":
             summary_text = handle_summarize_abstract(session_id)
-            conversation_history.setdefault(session_id, []).append(("bot", summary_text))
-            return jsonify({"text": summary_text, "session_id": session_id})
         elif action == "summarize_full":
             summary_text = handle_summarize_full(session_id)
-            conversation_history.setdefault(session_id, []).append(("bot", summary_text))
-            return jsonify({"text": summary_text, "session_id": session_id})
+        else:
+            summary_text = "Unknown action."
+        conversation_history.setdefault(session_id, []).append(("bot", summary_text))
+        return jsonify(build_interactive_response(summary_text, session_id))
     
     # Process as a normal text message.
     message = data.get("text", "").strip()
@@ -161,46 +197,24 @@ def query():
     if classification == "research":
         answer = answer_question(message, session_id)
         conversation_history.setdefault(session_id, []).append(("bot", answer))
-        return jsonify({"text": answer, "session_id": session_id})
+        return jsonify(build_interactive_response(answer, session_id))
     elif classification == "greeting":
         greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
         conversation_history.setdefault(session_id, []).append(("bot", greeting_msg))
-        return jsonify({"text": greeting_msg, "session_id": session_id})
+        return jsonify(build_interactive_response(greeting_msg, session_id))
     else:
         # For any other query, generate an interactive message with a concise summary and buttons.
         concise_prompt = (
             "Based solely on the research paper that was uploaded in this session, please provide a concise 1-2 sentence summary."
         )
         concise_summary = generate_pdf_response(concise_prompt, session_id)
-        interactive_message = {
-            "text": (
-                f"Weekly Reading Summary: {concise_summary}\n\n"
-                "Would you like a more detailed summary of the abstract or the full paper?\n"
-                "Or ask a specific question about the paper."
-            ),
-            "attachments": [
-                {
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Summarize Abstract",
-                            "action": "summarize_abstract",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "Summarize Full Paper",
-                            "action": "summarize_full",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ]
-        }
         conversation_history.setdefault(session_id, []).append(("bot", concise_summary))
-        return jsonify(interactive_message)
+        summary_text = (
+            f"Weekly Reading Summary: {concise_summary}\n\n"
+            "Would you like a more detailed summary of the abstract or the full paper?\n"
+            "Or ask a specific question about the paper."
+        )
+        return jsonify(build_interactive_response(summary_text, session_id))
 
 @app.errorhandler(404)
 def page_not_found(e):
