@@ -168,16 +168,17 @@ def query():
         return summarizing_llm_agent(paper_link, action)
 
     # Handle interactive callback from Rocket.Chat button presses.
-    if data.get("interactive_callback"):
-        action = data.get("action")
-        paper_link = data.get("link")
-        if action in ["summarize_abstract", "summarize_full"]:
-            return summarizing_llm_agent(paper_link, action)
-        else:
-            return jsonify({"error": "Unknown action"}), 400
+    # The following block is commented out to hide the "Summarize Paper" feature for now.
+    #
+    # if data.get("interactive_callback"):
+    #     action = data.get("action")
+    #     paper_link = data.get("link")
+    #     if action in ["summarize_abstract", "summarize_full"]:
+    #         return summarizing_llm_agent(paper_link, action)
+    #     else:
+    #         return jsonify({"error": "Unknown action"}), 400
 
-    # The following block for the "Summarize Paper" button has been commented out.
-    # When a user clicks "Summarize Paper", the interactive message with two buttons is not returned.
+    # The following block for the "Summarize Paper" button is also commented out to hide this feature.
     #
     # if data.get("action", "").lower() == "summarize":
     #     paper_link = data.get("link")
@@ -227,28 +228,29 @@ def query():
     classification = classify_query(message)
     if classification == "research":
         search_results = google_search(message, num_results=3)
-        interactive_attachments = []
-        for result in search_results:
-            attachment = {
-                "text": f"*{result['title']}*\n{result['snippet']}\n[🔗 View Paper]({result['link']})",
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Abstract Only",
-                        "msg": f"/summarize_abstract {result['link']}",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    },
-                    {
-                        "type": "button",
-                        "text": "Full Overview",
-                        "msg": f"/summarize_full {result['link']}",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            }
-            interactive_attachments.append(attachment)
+        # The interactive attachments with "Summarize Paper" buttons are hidden for now.
+        # interactive_attachments = []
+        # for result in search_results:
+        #     attachment = {
+        #         "text": f"*{result['title']}*\n{result['snippet']}\n[🔗 View Paper]({result['link']})",
+        #         "actions": [
+        #             {
+        #                 "type": "button",
+        #                 "text": "Abstract Only",
+        #                 "msg": f"/summarize_abstract {result['link']}",
+        #                 "msg_in_chat_window": True,
+        #                 "msg_processing_type": "sendMessage"
+        #             },
+        #             {
+        #                 "type": "button",
+        #                 "text": "Full Overview",
+        #                 "msg": f"/summarize_full {result['link']}",
+        #                 "msg_in_chat_window": True,
+        #                 "msg_processing_type": "sendMessage"
+        #             }
+        #         ]
+        #     }
+        #     interactive_attachments.append(attachment)
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         research_response = generate(
             model='4o-mini',
@@ -270,7 +272,7 @@ def query():
         conversation_history[session_id].append(("bot", bot_reply))
         if intro_message and len(conversation_history[session_id]) == 2:
             bot_reply = f"{intro_message}\n\n{bot_reply}"
-        return jsonify({"text": bot_reply, "attachments": interactive_attachments, "session_id": session_id})
+        return jsonify({"text": bot_reply, "session_id": session_id})
     elif classification == "greeting":
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
