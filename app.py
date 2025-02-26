@@ -10,14 +10,74 @@ from urllib.parse import urljoin
 import PyPDF2
 from bs4 import BeautifulSoup
 
+# Load environment variables (for local testing or production settings)
 load_dotenv()
+
+# PDF to be processed (the reading for this week)
+PDF_PATH = "WebServer/ChatGPT Dissatisfaction Paper.pdf"
 
 app = Flask(__name__)
 
 # Global conversation history.
 conversation_history = {}
 
-# LLM AGENT: Classify the query
+# Global mapping for interactive command tokens.
+action_tokens = {}
+
+def extract_text_from_pdf(pdf_path):
+    """Extracts text from a PDF file using PyPDF2."""
+    text = ""
+    try:
+        with open(pdf_path, "rb") as f:
+            pdf_reader = PyPDF2.PdfReader(f)
+            for page in pdf_reader.pages:
+                page_text = page.extract_text() or ""
+                text += page_text + "\n"
+        print(f"DEBUG: Extracted text from PDF at {pdf_path}")
+    except Exception as e:
+        print(f"DEBUG: Error reading PDF: {e}")
+    return text
+
+# LLM AGENT: Summarize the PDF reading.
+def summarizing_agent(pdf_path, action_type):
+    """
+    Extracts text from the given PDF and performs a detailed summarization based
+    on the action_type: either 'summarize_abstract' or 'summarize_full'.
+    The prompts include the context for CS-150: Generative AI for Impact.
+    Uses the entire PDF text for summarization.
+    """
+    pdf_text = extract_text_from_pdf(pdf_path)
+    if not pdf_text.strip():
+        return "Could not extract text from the provided PDF."
+    
+    if action_type == "summarize_abstract":
+        summary_prompt = (
+            f"Please provide a detailed summary focusing on the abstract of the reading for this week of CS-150: Generative AI for Impact based on the following paper text:\n\n{pdf_text}"
+        )
+    elif action_type == "summarize_full":
+        summary_prompt = (
+            f"Please provide a detailed summary of the reading for this week of CS-150: Generative AI for Impact based on the following paper text, including key findings, methodology, and conclusions:\n\n{pdf_text}"
+        )
+    else:
+        return "Invalid summarization action."
+    
+    summary_response = generate(
+        model='4o-mini',
+        system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
+        query=summary_prompt,
+        temperature=0.0,
+        lastk=0,
+        session_id="summarize_" + str(uuid.uuid4())
+    )
+    
+    if isinstance(summary_response, dict):
+        summary_text = summary_response.get('response', '').strip()
+    else:
+        summary_text = summary_response.strip()
+    
+    return summary_text
+
+# LLM AGENT: Classify the query.
 def classify_query(message):
     prompt = (
         f"Determine if the following message is a greeting, a research query, or something else. "
@@ -41,200 +101,120 @@ def classify_query(message):
     print(f"DEBUG: Classification result: {classification_text}")
     return classification_text
 
-# def extract_text_from_pdf(pdf_path):
-#     text = ""
-#     try:
-#         with open(pdf_path, "rb") as f:
-#             pdf_reader = PyPDF2.PdfReader(f)
-#             for page in pdf_reader.pages:
-#                 page_text = page.extract_text() or ""
-#                 text += page_text + "\n"
-#         print(f"DEBUG: Extracted text from PDF at {pdf_path}")
-#     except Exception as e:
-#         print(f"DEBUG: Error reading PDF: {e}")
-#     return text
-
-# def fetch_paper_text(link):
-#     paper_text = ""
-#     headers = {
-#         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-#                       "AppleWebKit/537.36 (KHTML, like Gecko) "
-#                       "Chrome/98.0.4758.102 Safari/537.36"
-#     }
-#     print(f"DEBUG: Fetching paper text from URL: {link}")
-#     response = requests.get(link, headers=headers)
-#     if response.status_code != 200:
-#         print(f"DEBUG: Error fetching URL: {link} - Status code: {response.status_code}")
-#         return paper_text
-#     soup = BeautifulSoup(response.content, "html.parser")
-#     print(f"DEBUG: Fetched HTML snippet: {soup.get_text()[:300]}")
-#     pdf_anchor = soup.find("a", href=lambda href: href and ".pdf" in href.lower())
-#     if pdf_anchor:
-#         pdf_link = urljoin(link, pdf_anchor.get("href"))
-#         print(f"DEBUG: Found PDF link: {pdf_link}")
-#         pdf_response = requests.get(pdf_link, headers=headers)
-#         if pdf_response.status_code == 200:
-#             temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-#             with open(temp_pdf.name, "wb") as f:
-#                 f.write(pdf_response.content)
-#             print(f"DEBUG: Downloaded PDF to temporary file: {temp_pdf.name}")
-#             paper_text = extract_text_from_pdf(temp_pdf.name)
-#         else:
-#             print(f"DEBUG: Error fetching PDF link: {pdf_link} - Status code: {pdf_response.status_code}")
-#     else:
-#         print("DEBUG: No PDF link found; using HTML text")
-#         paper_text = soup.get_text(separator="\n")
-#     print(f"DEBUG: Retrieved paper text length: {len(paper_text)} characters")
-#     return paper_text
-
-# def summarizing_llm_agent(paper_link, action_type):
-#     """
-#     This function acts as the dedicated summarizing LLM agent.
-#     It fetches the paper text, sends a summarization prompt to the LLM, and returns the summary.
-#     """
-#     print(f"DEBUG: Summarizing LLM Agent triggered for action: {action_type}, link: {paper_link}")
-#     paper_text = fetch_paper_text(paper_link)
-#     if not paper_text or len(paper_text.strip()) == 0:
-#         print("DEBUG: Could not retrieve paper content")
-#         return jsonify({"error": "Could not retrieve paper content"}), 400
-
-#     excerpt = paper_text[:3000]
-#     if action_type == "summarize_abstract":
-#         summary_prompt = (
-#             f"Please provide a detailed summary focusing on the abstract of the following research paper text:\n\n{excerpt}"
-#         )
-#     else:  # summarize_full
-#         summary_prompt = (
-#             f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
-#         )
-
-#     print("DEBUG: Sending summarization prompt to LLM")
-#     summary_response = generate(
-#         model='4o-mini',
-#         system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
-#         query=summary_prompt,
-#         temperature=0.0,
-#         lastk=0,
-#         session_id="summarize_" + str(uuid.uuid4())
-#     )
-#     if isinstance(summary_response, dict):
-#         summary_text = summary_response.get('response', '').strip()
-#     else:
-#         summary_text = summary_response.strip()
-#     print(f"DEBUG: Received summary text: {summary_text[:300]}...")
-#     return jsonify({"text": summary_text})
-
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
 
-    # If the message text itself starts with a summarization command, handle it immediately.
     message = data.get("text", "")
-    # if message.startswith("/summarize_abstract") or message.startswith("/summarize_full"):
-    #     parts = message.split()
-    #     action = parts[0][1:]  # remove the leading slash
-    #     paper_link = " ".join(parts[1:])
-    #     return summarizing_llm_agent(paper_link, action)
-
-    # Handle interactive callback from Rocket.Chat button presses.
-    # The following block is commented out to hide the "Summarize Paper" feature for now.
-    #
-    # if data.get("interactive_callback"):
-    #     action = data.get("action")
-    #     paper_link = data.get("link")
-    #     if action in ["summarize_abstract", "summarize_full"]:
-    #         return summarizing_llm_agent(paper_link, action)
-    #     else:
-    #         return jsonify({"error": "Unknown action"}), 400
-
-    # The following block for the "Summarize Paper" button is also commented out to hide this feature.
-    #
-    # if data.get("action", "").lower() == "summarize":
-    #     paper_link = data.get("link")
-    #     if not paper_link:
-    #         print("DEBUG: No paper link provided in request")
-    #         return jsonify({"error": "No paper link provided"}), 400
-    #     interactive_message = {
-    #         "text": "Would you like a summary of the abstract only or a full overview?",
-    #         "attachments": [
-    #             {
-    #                 "actions": [
-    #                     {
-    #                         "type": "button",
-    #                         "text": "Abstract Only",
-    #                         "msg": f"/summarize_abstract {paper_link}",
-    #                         "msg_in_chat_window": True,x` `
-    #                         "msg_processing_type": "sendMessage"
-    #                     },
-    #                     {
-    #                         "type": "button",
-    #                         "text": "Full Overview",
-    #                         "msg": f"/summarize_full {paper_link}",
-    #                         "msg_in_chat_window": True,
-    #                         "msg_processing_type": "sendMessage"
-    #                     }
-    #                 ]
-    #             }
-    #         ]
-    #     }
-    #     print("DEBUG: Returning interactive button message")
-    #     return jsonify(interactive_message)
-
-    # Handle general conversation queries.
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
+    
+    # Ignore messages from the bot itself.
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
+    
+    # Check if the message is a direct execution command from an interactive button.
+    if message.startswith("/execute_action"):
+        parts = message.split(maxsplit=1)
+        if len(parts) < 2:
+            error_msg = "No action token provided."
+            print(f"DEBUG: {error_msg}")
+            return jsonify({"error": error_msg}), 400
+        token = parts[1].strip()
+        if token not in action_tokens:
+            error_msg = "Invalid or expired action token."
+            print(f"DEBUG: {error_msg}")
+            return jsonify({"error": error_msg}), 400
+        action_type, pdf_path = action_tokens.pop(token)
+        summary_text = summarizing_agent(pdf_path, action_type)
+        return jsonify({"text": summary_text})
+    
+    # Initialize conversation history with an intro message if needed.
     if session_id not in conversation_history:
         intro_message = (
-            "Hello! I am Research Assistant Bot. I specialize in retrieving and summarizing academic research, "
-            "datasets, and scientific studies. I can also chat generally. How may I assist you today?"
+            "Hello! I am your friendly TA for CS-150: Generative AI for Impact. "
+            "Let's review this week's reading."
         )
         conversation_history[session_id] = [("bot", intro_message)]
     else:
         intro_message = None
     conversation_history[session_id].append(("user", message))
+
     classification = classify_query(message)
+
     if classification == "research":
-        search_results = google_search(message, num_results=3)
-        # Although the interactive buttons are hidden, we still include the paper links in the text response.
-        results_text = ""
-        for result in search_results:
-            results_text += f"\n\n*{result['title']}*\n{result['snippet']}\n[🔗 View Paper]({result['link']})"
-        query_with_context = "\n".join(text for _, text in conversation_history[session_id])
-        research_response = generate(
-            model='4o-mini',
-            system=(
-                "You are a Research Assistant AI that specializes in retrieving published academic "
-                "research, datasets, and scientific studies. Based on the user's query, find resources "
-                "based on the user's topic of interest. You will provide a brief summary (1-2 sentences)"
-                "of each paper and a link to the paper. If the user is asking a follow up question about "
-                "the last research query, you will provide follow up answers from the papers you find "
-                "based on the user's follow up questions while citing the paper."
-            ),
-            query=query_with_context,
-            temperature=0.0,
-            lastk=10,
-            session_id=session_id
+        # Use the provided PDF path if available, otherwise fall back to the global PDF_PATH.
+        pdf_path = data.get("pdf_path", PDF_PATH)
+        if not os.path.exists(pdf_path):
+            error_msg = f"PDF not found at {pdf_path}"
+            print(f"DEBUG: {error_msg}")
+            return jsonify({"error": error_msg}), 400
+
+        # Extract text from the PDF and generate a concise summary specifically for the weekly reading.
+        pdf_text = extract_text_from_pdf(pdf_path)
+        if not pdf_text.strip():
+            error_msg = "Could not extract text from the provided PDF."
+            print(f"DEBUG: {error_msg}")
+            return jsonify({"error": error_msg}), 400
+
+        summary_prompt = (
+            f"Please provide a concise 1-2 sentence summary of the reading for this week of CS-150: Generative AI for Impact based on the following paper text:\n\n{pdf_text}"
         )
-        if isinstance(research_response, dict):
-            response_text = research_response.get('response', "").strip()
+        concise_summary_response = generate(
+            model='4o-mini',
+            system="You are an academic summarizer. Provide a concise 1-2 sentence summary of the weekly reading.",
+            query=summary_prompt,
+            temperature=0.0,
+            lastk=0,
+            session_id="pdf_concise_" + str(uuid.uuid4())
+        )
+        if isinstance(concise_summary_response, dict):
+            concise_summary = concise_summary_response.get('response', '').strip()
         else:
-            response_text = research_response.strip()
-        bot_reply = response_text
-        conversation_history[session_id].append(("bot", bot_reply))
-        if intro_message and len(conversation_history[session_id]) == 2:
-            bot_reply = f"{intro_message}\n\n{bot_reply}"
-        # Append the paper links to the final reply.
-        bot_reply += "\n\nHere are some papers I found:" + results_text
-        return jsonify({"text": bot_reply, "session_id": session_id})
+            concise_summary = concise_summary_response.strip()
+
+        # Generate opaque tokens for the two interactive actions.
+        abstract_token = str(uuid.uuid4())
+        full_token = str(uuid.uuid4())
+        action_tokens[abstract_token] = ("summarize_abstract", pdf_path)
+        action_tokens[full_token] = ("summarize_full", pdf_path)
+
+        # Build interactive Rocket.Chat message with buttons that use the opaque tokens.
+        interactive_message = {
+            "text": (
+                f"Weekly Reading Summary: {concise_summary}\n\n"
+                "Would you like a more detailed summary of the abstract or a detailed summary of the full paper?"
+            ),
+            "attachments": [
+                {
+                    "actions": [
+                        {
+                            "type": "button",
+                            "text": "Summarize Abstract",
+                            "msg": f"/execute_action {abstract_token}",
+                            "msg_in_chat_window": True,
+                            "msg_processing_type": "sendMessage"
+                        },
+                        {
+                            "type": "button",
+                            "text": "Summarize Full Paper",
+                            "msg": f"/execute_action {full_token}",
+                            "msg_in_chat_window": True,
+                            "msg_processing_type": "sendMessage"
+                        }
+                    ]
+                }
+            ]
+        }
+        conversation_history[session_id].append(("bot", concise_summary))
+        return jsonify(interactive_message)
+
     elif classification == "greeting":
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
             model='4o-mini',
-            system="You are a friendly chatbot assistant who will prompt the user to " 
-                    "provide a research topic they're interested in.",
+            system="You are a friendly TA chatbot for CS-150: Generative AI for Impact. Please prompt the user with the weekly reading summary.",
             query=query_with_context,
             temperature=0.5,
             lastk=0,
@@ -247,14 +227,14 @@ def query():
         bot_reply = response_text
     elif classification == "other":
         bot_reply = (
-            "I'm a research paper assistant and I specialize in academic research, datasets, and scientific studies. "
-            "I'm sorry, but I can only help with research-related queries. Please ask me about research topics or papers."
+            "I'm the TA for CS-150: Generative AI for Impact. I can help you with this week's reading. "
+            "Please ask me about the reading or request a summary."
         )
     else:
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
             model='4o-mini',
-            system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
+            system="You are a friendly TA chatbot for CS-150: Generative AI for Impact. Please assist the student with questions about the weekly reading.",
             query=query_with_context,
             temperature=0.5,
             lastk=0,
@@ -265,6 +245,7 @@ def query():
         else:
             response_text = general_response.strip()
         bot_reply = response_text
+
     conversation_history[session_id].append(("bot", bot_reply))
     return jsonify({"text": bot_reply, "session_id": session_id})
 
