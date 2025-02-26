@@ -52,33 +52,49 @@ def generate_summary_response(prompt, session_id):
         rag_threshold=0.3,
         rag_k=1
     )
-    return response.get('response', '').strip() if isinstance(response, dict) else response.strip()
+    if isinstance(response, dict):
+        return response.get('response', '').strip()
+    else:
+        return response.strip()
 
 def summarizing_agent(action_type, session_id):
     """
     Uploads the PDF (if needed) and then calls generate to produce a summary.
+    The prompt instructs the model to use the PDF uploaded under the given session.
     """
     if not upload_pdf_if_needed(PDF_PATH, session_id):
         return "Could not upload PDF."
     
     if action_type == "summarize_abstract":
-        prompt = "Summarize the abstract from the uploaded research paper. Provide key objectives and main points."
+        prompt = (
+            "Based solely on the research paper that was uploaded in this session, please provide a detailed summary "
+            "focusing on the abstract. Include the main objectives and key points of the abstract. Do not use any external context."
+        )
     elif action_type == "summarize_full":
-        prompt = "Summarize the entire research paper including title, methodology, key findings, and conclusions."
+        prompt = (
+            "Based solely on the research paper that was uploaded in this session, please provide a detailed summary of the entire paper. "
+            "Include the title, key findings, methodology, and conclusions. Do not use any external context."
+        )
     else:
         return "Invalid summarization action."
     
-    time.sleep(10)  # Ensure PDF is processed
+    # Wait 10 seconds for the PDF to be fully processed
+    time.sleep(10)
     return generate_summary_response(prompt, session_id)
 
 def answer_question(question, session_id):
     """
-    Answers a specific question about the research paper using the uploaded PDF.
+    Uploads the PDF (if needed) and then answers a specific question about the paper
+    using the uploaded PDF as context.
     """
     if not upload_pdf_if_needed(PDF_PATH, session_id):
         return "Could not upload PDF."
     
-    prompt = f"Answer the following question based on the uploaded research paper:\n\n{question}"
+    prompt = (
+        f"Based solely on the research paper that was uploaded in this session, answer the following question:\n\n{question}\n\n"
+        "Provide the answer using only the content of the uploaded PDF."
+    )
+    # Wait 10 seconds to ensure the PDF is processed.
     time.sleep(10)
     return generate_summary_response(prompt, session_id)
 
@@ -87,10 +103,11 @@ def classify_query(message):
     Classifies the user message as 'greeting', 'research', or 'other'.
     """
     prompt = (
-        "Determine if the following message is a greeting, a research-related question, or something else. "
+        "Determine if the following message is a greeting, a query about the research paper, or something else. "
         "Reply with one word: 'greeting', 'research', or 'other'.\n\n"
         f"Message: \"{message}\""
     )
+    print(f"DEBUG: Classifying query: {message}")
     classification = generate(
         model='4o-mini',
         system="You are a query classifier.",
@@ -102,7 +119,10 @@ def classify_query(message):
         rag_threshold=0.3,
         rag_k=1
     )
-    return classification.get('response', '').strip().lower() if isinstance(classification, dict) else classification.strip().lower()
+    if isinstance(classification, dict):
+        return classification.get('response', '').strip().lower()
+    else:
+        return classification.strip().lower()
 
 # Button action handlers.
 def handle_summarize_abstract(session_id):
@@ -115,7 +135,7 @@ def handle_summarize_full(session_id):
 
 def build_interactive_response(text, session_id):
     """
-    Builds a response payload with interactive buttons.
+    Helper to build a response payload with interactive buttons.
     """
     return {
         "text": text,
@@ -128,13 +148,13 @@ def build_interactive_response(text, session_id):
                         "type": "button",
                         "text": "Summarize Abstract",
                         "msg": "summarize_abstract",
-                        "msg_in_chat_window": False
+                        "msg_in_chat_window": True
                     },
                     {
                         "type": "button",
                         "text": "Summarize Full Paper",
                         "msg": "summarize_full",
-                        "msg_in_chat_window": False
+                        "msg_in_chat_window": True
                     }
                 ]
             }
@@ -143,26 +163,33 @@ def build_interactive_response(text, session_id):
 
 @app.route('/query', methods=['POST'])
 def query():
-    data = request.get_json() or request.form  # Support JSON and form-encoded requests
+    data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
     session_id = get_session_id(data)
     
-    # If an "action" or "msg" key is present (button click), process it.
-    action = data.get("action") or data.get("msg")
+    # If an "action" or "value" key is present (i.e. a button press), handle it directly.
+    action = data.get("action") or data.get("value")
     if action:
-        print(f"DEBUG: Button clicked: {action}")
+        print(f"DEBUG: Interactive button clicked: {action}")
+        # Inform the user that processing has started.
+        processing_msg = "Processing summary, please wait..."
+        conversation_history.setdefault(session_id, []).append(("bot", processing_msg))
         
         if action == "summarize_abstract":
+            print(f"DEBUG: User requested abstract summary for session {session_id}")
             summary_text = handle_summarize_abstract(session_id)
         elif action == "summarize_full":
+            print(f"DEBUG: User requested full paper summary for session {session_id}")
             summary_text = handle_summarize_full(session_id)
         else:
+            print(f"DEBUG: Unknown action requested: {action}")
             summary_text = "Unknown action."
 
+        print(f"DEBUG: Summary response: {summary_text}")
         conversation_history.setdefault(session_id, []).append(("bot", summary_text))
         return jsonify(build_interactive_response(summary_text, session_id))
     
-    # Process regular text messages
+    # Process as a normal text message.
     message = data.get("text", "").strip()
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
@@ -176,16 +203,20 @@ def query():
         conversation_history.setdefault(session_id, []).append(("bot", answer))
         return jsonify(build_interactive_response(answer, session_id))
     elif classification == "greeting":
-        greeting_msg = "Hello! Please ask a question about the research paper or use the buttons below."
+        greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
         conversation_history.setdefault(session_id, []).append(("bot", greeting_msg))
         return jsonify(build_interactive_response(greeting_msg, session_id))
     else:
-        concise_summary = generate_summary_response("Provide a 1-2 sentence summary of the research paper.", session_id)
+        # For any other query, generate an interactive message with a concise summary and buttons.
+        concise_prompt = (
+            "Based solely on the research paper that was uploaded in this session, please provide a concise 1-2 sentence summary."
+        )
+        concise_summary = generate_summary_response(concise_prompt, session_id)
         conversation_history.setdefault(session_id, []).append(("bot", concise_summary))
         summary_text = (
-            f"Summary: {concise_summary}\n\n"
-            "Would you like a detailed summary of the abstract or full paper?\n"
-            "Or ask a specific question."
+            f"Weekly Reading Summary: {concise_summary}\n\n"
+            "Would you like a more detailed summary of the abstract or the full paper?\n"
+            "Or ask a specific question about the paper."
         )
         return jsonify(build_interactive_response(summary_text, session_id))
 
