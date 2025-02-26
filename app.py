@@ -236,15 +236,16 @@ def query():
         research_response = generate(
             model='4o-mini',
             system=(
-                "You are a Research Assistant AI that specializes in retrieving academic "
-                "research, datasets, and scientific studies. You will provide a brief summary "
-                "of each paper and a link to the paper. You will provide follow up answers "
-                "from the papers you find based on the user's follow up questions while citing "
-                "the paper. You will also provide a link to the paper."
+                "You are a Research Assistant AI that specializes in retrieving published academic "
+                "research, datasets, and scientific studies. Based on the user's query, find resources "
+                "based on the user's topic of interest. You will provide a brief summary (1-2 sentences)"
+                "of each paper and a link to the paper. If the user is asking a follow up question about "
+                "the last research query, you will provide follow up answers from the papers you find "
+                "based on the user's follow up questions while citing the paper."
             ),
             query=query_with_context,
             temperature=0.0,
-            lastk=256,
+            lastk=10,
             session_id=session_id
         )
         if isinstance(research_response, dict):
@@ -262,7 +263,8 @@ def query():
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         general_response = generate(
             model='4o-mini',
-            system="You are a friendly chatbot assistant who will prompt the user to provide a research topic they're interested in.",
+            system="You are a friendly chatbot assistant who will prompt the user to " 
+                    "provide a research topic they're interested in.",
             query=query_with_context,
             temperature=0.5,
             lastk=0,
