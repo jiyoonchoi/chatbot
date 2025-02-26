@@ -129,7 +129,6 @@ def query():
     print(f"DEBUG: Received request data: {data}")
 
     # Handle interactive callback from Rocket.Chat button presses.
-    # Note: This branch creates a new summarization session and does not affect the main chat.
     if data.get("interactive_callback"):
         action = data.get("action")
         paper_link = data.get("link")
@@ -138,12 +137,13 @@ def query():
         else:
             return jsonify({"error": "Unknown action"}), 400
 
-    # When a user clicks "Summarize Paper", return an interactive message with two buttons.
+    # When a user clicks "Summarize Paper" we trigger the interactive message.
     if data.get("action", "").lower() == "summarize":
         paper_link = data.get("link")
         if not paper_link:
             print("DEBUG: No paper link provided in request")
             return jsonify({"error": "No paper link provided"}), 400
+        # Return an interactive message with two buttons rather than a markdown link.
         interactive_message = {
             "text": "Would you like a summary of the abstract only or a full overview?",
             "attachments": [
@@ -170,7 +170,7 @@ def query():
         print("DEBUG: Returning interactive button message")
         return jsonify(interactive_message)
 
-    # For regular conversation queries, proceed with main chat handling.
+    # Conversation handling for research queries, greetings, etc.
     user_id = data.get("user_id", "unknown_user")
     session_id = data.get("session_id", f"session_{user_id}_{str(uuid.uuid4())}")
     message = data.get("text", "")
@@ -212,6 +212,7 @@ def query():
             }
             interactive_attachments.append(attachment)
 
+        # Build the query context with previous conversation.
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
         research_response = generate(
             model='4o-mini',
@@ -233,6 +234,7 @@ def query():
         conversation_history[session_id].append(("bot", bot_reply))
         if intro_message and len(conversation_history[session_id]) == 2:
             bot_reply = f"{intro_message}\n\n{bot_reply}"
+        # Return both the bot reply and the interactive attachments for each search result.
         return jsonify({"text": bot_reply, "attachments": interactive_attachments, "session_id": session_id})
     elif classification == "greeting":
         query_with_context = "\n".join(text for _, text in conversation_history[session_id])
@@ -274,8 +276,8 @@ def query():
 
 def handle_summarization(paper_link, action_type):
     """
-    This function creates a new LLM agent (using a new session_id) to handle summarization.
-    The summarization result (in PDF form) is returned directly to the user and is not added to the main chat.
+    Helper function to fetch paper text and generate a summary.
+    The action_type determines if we summarize just the abstract or provide a full overview.
     """
     print(f"DEBUG: Handling summarization for action: {action_type}, link: {paper_link}")
     paper_text = fetch_paper_text(paper_link)
@@ -293,7 +295,7 @@ def handle_summarization(paper_link, action_type):
             f"Please provide a detailed summary of the following research paper text, including key findings, methodology, and conclusions:\n\n{excerpt}"
         )
 
-    print("DEBUG: Sending summarization prompt to new LLM agent")
+    print("DEBUG: Sending summarization prompt to LLM")
     summary_response = generate(
         model='4o-mini',
         system="You are an expert summarizer of academic papers. Provide a detailed and accurate summary.",
@@ -308,6 +310,7 @@ def handle_summarization(paper_link, action_type):
         summary_text = summary_response.strip()
 
     print(f"DEBUG: Received summary text: {summary_text[:300]}...")
+    # Generate PDF in memory using FPDF.
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
