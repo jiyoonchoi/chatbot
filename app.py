@@ -176,37 +176,39 @@ def query():
         else:
             return jsonify({"error": "Unknown action"}), 400
 
-    # When a user clicks "Summarize Paper", return an interactive message with two buttons.
-    if data.get("action", "").lower() == "summarize":
-        paper_link = data.get("link")
-        if not paper_link:
-            print("DEBUG: No paper link provided in request")
-            return jsonify({"error": "No paper link provided"}), 400
-        interactive_message = {
-            "text": "Would you like a summary of the abstract only or a full overview?",
-            "attachments": [
-                {
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Abstract Only",
-                            "msg": f"/summarize_abstract {paper_link}",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "Full Overview",
-                            "msg": f"/summarize_full {paper_link}",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ]
-        }
-        print("DEBUG: Returning interactive button message")
-        return jsonify(interactive_message)
+    # The following block for the "Summarize Paper" button has been commented out.
+    # When a user clicks "Summarize Paper", the interactive message with two buttons is not returned.
+    #
+    # if data.get("action", "").lower() == "summarize":
+    #     paper_link = data.get("link")
+    #     if not paper_link:
+    #         print("DEBUG: No paper link provided in request")
+    #         return jsonify({"error": "No paper link provided"}), 400
+    #     interactive_message = {
+    #         "text": "Would you like a summary of the abstract only or a full overview?",
+    #         "attachments": [
+    #             {
+    #                 "actions": [
+    #                     {
+    #                         "type": "button",
+    #                         "text": "Abstract Only",
+    #                         "msg": f"/summarize_abstract {paper_link}",
+    #                         "msg_in_chat_window": True,
+    #                         "msg_processing_type": "sendMessage"
+    #                     },
+    #                     {
+    #                         "type": "button",
+    #                         "text": "Full Overview",
+    #                         "msg": f"/summarize_full {paper_link}",
+    #                         "msg_in_chat_window": True,
+    #                         "msg_processing_type": "sendMessage"
+    #                     }
+    #                 ]
+    #             }
+    #         ]
+    #     }
+    #     print("DEBUG: Returning interactive button message")
+    #     return jsonify(interactive_message)
 
     # Handle general conversation queries.
     user_id = data.get("user_id", "unknown_user")
