@@ -13,20 +13,16 @@ from bs4 import BeautifulSoup
 load_dotenv()
 
 app = Flask(__name__)
-app.config['PDF_FOLDER'] = os.path.join(os.getcwd(), 'static', 'pdfs')
-os.makedirs(app.config['PDF_FOLDER'], exist_ok=True)
-
-# Environment variables for Google Custom Search API.
-API_KEY = os.environ.get("googleApiKey")
-CSE_ID = os.environ.get("googleSearchId")
 
 # Global conversation history.
 conversation_history = {}
 
+# LLM AGENT: Classify the query
 def classify_query(message):
     prompt = (
         f"Determine if the following message is a greeting, a research query, or something else. "
-        f"Reply with just one word: 'greeting' if it's a simple greeting, 'research' if it's asking for research-related information, or 'other' if it is unrelated to research. "
+        f"Reply with just one word: 'greeting' if it's a simple greeting, 'research' if it's asking "
+        f"for research-related information, or 'other' if it is unrelated to research. "
         f"Message: \"{message}\""
     )
     print(f"DEBUG: Classifying query: {message}")
@@ -44,32 +40,6 @@ def classify_query(message):
         classification_text = classification.strip().lower()
     print(f"DEBUG: Classification result: {classification_text}")
     return classification_text
-
-def google_search(query, num_results=3):
-    search_query = (
-        f"{query} filetype:pdf OR site:researchgate.net OR site:ncbi.nlm.nih.gov OR site:data.gov "
-        "OR site:arxiv.org OR site:worldbank.org OR site:europa.eu OR site:sciencedirect.com OR site:scholar.google.com"
-    )
-    url = "https://www.googleapis.com/customsearch/v1"
-    params = {'q': search_query, 'key': API_KEY, 'cx': CSE_ID, 'num': num_results}
-    print(f"DEBUG: Performing Google Search with query: {search_query}")
-    response = requests.get(url, params=params)
-    if response.status_code != 200:
-        print(f"DEBUG: Google Search API Error: {response.status_code}, {response.text}")
-        return []
-    results = response.json().get("items", [])
-    search_results = []
-    for item in results:
-        title = item.get("title", "No title available")
-        snippet = item.get("snippet", "No description available")
-        link = item.get("link", "#")
-        search_results.append({
-            "title": title,
-            "snippet": snippet,
-            "link": link
-        })
-    print(f"DEBUG: Google search results: {search_results}")
-    return search_results
 
 # def extract_text_from_pdf(pdf_path):
 #     text = ""
@@ -194,7 +164,7 @@ def query():
     #                         "type": "button",
     #                         "text": "Abstract Only",
     #                         "msg": f"/summarize_abstract {paper_link}",
-    #                         "msg_in_chat_window": True,
+    #                         "msg_in_chat_window": True,x` `
     #                         "msg_processing_type": "sendMessage"
     #                     },
     #                     {
