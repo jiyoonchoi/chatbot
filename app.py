@@ -47,6 +47,13 @@ def classify_query(message):
     return classification_text
 
 def google_search(query, num_results=3):
+    """
+    Perform a Google Custom Search for research-related PDFs and resources.
+    Enhances the query to target PDFs or select research domains.
+    Returns a list of formatted markdown strings with 'View Paper' and
+    'Summarize Paper' buttons that use a standard HTTP URL.
+    """
+    # Enhance query to target research papers.
     search_query = (
         f"{query} filetype:pdf OR site:researchgate.net OR site:ncbi.nlm.nih.gov OR site:data.gov "
         "OR site:arxiv.org OR site:worldbank.org OR site:europa.eu OR site:sciencedirect.com OR site:scholar.google.com"
@@ -65,7 +72,7 @@ def google_search(query, num_results=3):
         snippet = item.get("snippet", "No description available")
         link = item.get("link", "#")
         search_summaries.append(
-            f"**{title}**\n{snippet}\n[🔗 View Paper]({link})  [Summarize Paper](command:summarize?link={link})\n"
+            f"**{title}**\n{snippet}\n[🔗 View Paper]({link})  [Summarize Paper](http://localhost:5000/query?action=summarize&link={link}))\n"
         )
     print(f"DEBUG: Google search results: {search_summaries}")
     return search_summaries
