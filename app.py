@@ -92,11 +92,9 @@ def query():
     """Handles incoming queries, including interactive button presses."""
     data = request.get_json()
     print(f"DEBUG: Received request data: {data}")
-    
-    # Check for interactive callback in top-level or within "params"
-    interactive = data.get("interactive_callback") or (data.get("params") and data["params"].get("interactive_callback"))
-    if interactive:
-        # Extract action and link from "params" if available; otherwise, use top-level keys.
+
+    # Handle interactive callback: Check both top-level and nested "params".
+    if data.get("interactive_callback") or (data.get("params") and data["params"].get("interactive_callback")):
         params = data.get("params", {})
         action = params.get("action") or data.get("action")
         paper_link = params.get("link") or data.get("link")
@@ -109,7 +107,6 @@ def query():
         paper_link = data.get("link")
         if not paper_link:
             return jsonify({"error": "No paper link provided"}), 400
-        
         interactive_message = {
             "text": "Would you like a summary of the abstract only or a full overview?",
             "attachments": [
@@ -118,7 +115,7 @@ def query():
                         {
                             "type": "button",
                             "text": "Abstract Only",
-                            "msg": "/query",  # The msg is still required for Rocket.Chat, even if hidden.
+                            "msg": "/query",
                             "msg_in_chat_window": False,
                             "msg_processing_type": "sendMessage",
                             "params": {
@@ -146,6 +143,12 @@ def query():
         print("DEBUG: Returning interactive button message")
         return jsonify(interactive_message)
 
+    # Handle general conversation queries.
+    if data.get("text"):
+        # Replace this simple echo with your general LLM conversation handling.
+        response_text = "General conversation response: " + data.get("text")
+        return jsonify({"text": response_text})
+    
     return jsonify({"error": "Unsupported query type"}), 400
 
 @app.errorhandler(404)
