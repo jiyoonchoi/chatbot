@@ -136,24 +136,29 @@ def handle_summarize_full(session_id):
 def build_interactive_response(text, session_id):
     """
     Helper to build a response payload with persistent interactive buttons.
+    This payload now uses Slack-style keys (callback_id, name, and value) so that Rocket.Chat
+    can properly render interactive buttons.
     """
     return {
         "text": text,
         "session_id": session_id,
         "attachments": [
             {
+                "callback_id": "summary_buttons",
                 "actions": [
                     {
                         "type": "button",
+                        "name": "summarize_abstract",
                         "text": "Summarize Abstract",
-                        "action": "summarize_abstract",
+                        "value": "summarize_abstract",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
+                        "name": "summarize_full",
                         "text": "Summarize Full Paper",
-                        "action": "summarize_full",
+                        "value": "summarize_full",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
@@ -168,16 +173,14 @@ def query():
     print(f"DEBUG: Received request data: {data}")
     session_id = get_session_id(data)
     
-    # If an "action" key is present (i.e. a button press), handle it directly.
-    action = data.get("action")
+    # If an "action" or "value" key is present (i.e. a button press), handle it directly.
+    action = data.get("action") or data.get("value")
     if action:
-        # Log the button click.
         print(f"DEBUG: Interactive button clicked: {action}")
         # Inform the user that processing has started.
         processing_msg = "Processing summary, please wait..."
         conversation_history.setdefault(session_id, []).append(("bot", processing_msg))
-        # You could optionally send this message to the client immediately.
-        # Now process the button action.
+        
         if action == "summarize_abstract":
             print(f"DEBUG: User requested abstract summary for session {session_id}")
             summary_text = handle_summarize_abstract(session_id)
