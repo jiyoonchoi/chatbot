@@ -247,17 +247,17 @@ def query():
                         {
                             "type": "button",
                             "text": "Abstract Only",
-                            "action": "summarize_abstract",  # new key instead of 'msg'
-                            "link": paper_link,             # provide the paper link
-                            "msg_in_chat_window": False,    # do not show command in chat
-                            "msg_processing_type": "interactive_callback"  # trigger callback
+                            "action": "summarize_abstract",
+                            "link": paper_link,          
+                            "msg_in_chat_window": True, 
+                            "msg_processing_type": "interactive_callback" 
                         },
                         {
                             "type": "button",
                             "text": "Full Overview",
                             "action": "summarize_full",
                             "link": paper_link,
-                            "msg_in_chat_window": False,
+                            "msg_in_chat_window": True,
                             "msg_processing_type": "interactive_callback"
                         }
                     ]
@@ -293,7 +293,7 @@ def query():
                         "text": "Abstract Only",
                         "action": "summarize_abstract",
                         "link": result['link'],
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "interactive_callback"
                     },
                     {
@@ -301,7 +301,7 @@ def query():
                         "text": "Full Overview",
                         "action": "summarize_full",
                         "link": result['link'],
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "interactive_callback"
                     }
                 ]
