@@ -290,14 +290,14 @@ def query():
                         "type": "button",
                         "text": "Abstract Only",
                         "msg": f"/summarize_abstract {result['link']}",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Full Overview",
                         "msg": f"/summarize_full {result['link']}",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     }
                 ]
