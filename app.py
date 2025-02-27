@@ -19,7 +19,7 @@ conversation_history = {}
 
 def get_session_id(data):
     """
-    Returns a consistent session ID based on the user_name (as in the TA code).
+    Returns a consistent session ID based solely on the user_name.
     """
     user = data.get("user_name", "unknown_user").strip().lower()
     return f"session_{user}"
@@ -75,8 +75,7 @@ def summarizing_agent(action_type, session_id):
     else:
         return "Invalid summarization action."
     
-    # Wait 10 seconds for the PDF to be fully processed.
-    time.sleep(10)
+    time.sleep(10)  # Ensure PDF is processed
     return generate_summary_response(prompt, session_id)
 
 def answer_question(question, session_id):
@@ -93,6 +92,29 @@ def answer_question(question, session_id):
     )
     time.sleep(10)
     return generate_summary_response(prompt, session_id)
+
+def classify_query(message):
+    """
+    Classifies the user message as 'greeting', 'research', or 'other'.
+    """
+    prompt = (
+        "Determine if the following message is a greeting, a query about the research paper, or something else. "
+        "Reply with one word: 'greeting', 'research', or 'other'.\n\n"
+        f"Message: \"{message}\""
+    )
+    print(f"DEBUG: Classifying query: {message}")
+    classification = generate(
+        model='4o-mini',
+        system="You are a query classifier.",
+        query=prompt,
+        temperature=0.0,
+        lastk=0,
+        session_id="classify_" + str(uuid.uuid4()),
+        rag_usage=True,
+        rag_threshold=0.3,
+        rag_k=1
+    )
+    return classification.get('response', '').strip().lower() if isinstance(classification, dict) else classification.strip().lower()
 
 def build_interactive_response(response_text, session_id):
     """
@@ -126,7 +148,7 @@ def build_interactive_response(response_text, session_id):
 
 @app.route('/query', methods=['POST'])
 def query():
-    data = request.get_json() or request.form  # Support JSON or form data
+    data = request.get_json() or request.form  # Support JSON and form data
     print(f"DEBUG: Received request data: {data}")
     
     # Use user_name as in the TA example.
@@ -140,77 +162,40 @@ def query():
     print(f"Message from {user}: {message}")
     session_id = get_session_id(data)
     
-    # If the user clicked a button, the message text will be one of our commands.
+    # If the message is exactly "summarize_abstract" or "summarize_full", handle the summarization button clicks.
     if message == "summarize_abstract":
         summary_text = summarizing_agent("summarize_abstract", session_id)
-        response = {
-            "text": summary_text,
-            "attachments": [
-                {
-                    "text": "You have selected: ✅ Summarize Abstract!",
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Thanks for the feedback 😃",
-                            "msg": "post_acknowledge",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ]
-        }
-        return jsonify(response)
+        return jsonify({"text": summary_text, "session_id": session_id})
     
     elif message == "summarize_full":
         summary_text = summarizing_agent("summarize_full", session_id)
-        response = {
-            "text": summary_text,
-            "attachments": [
-                {
-                    "text": "You have selected: ✅ Summarize Full Paper!",
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Thanks for the feedback 😃",
-                            "msg": "post_acknowledge",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ]
-        }
-        return jsonify(response)
+        return jsonify({"text": summary_text, "session_id": session_id})
     else:
-        # Otherwise, treat it as a research question.
-        response_text = answer_question(message, session_id)
-        response = {
-            "text": response_text,
-            "attachments": [
-                {
-                    "title": "User Options",
-                    "text": "Would you like a summary?",
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Summarize Abstract",
-                            "msg": "summarize_abstract",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "Summarize Full Paper",
-                            "msg": "summarize_full",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ]
-        }
-        return jsonify(response)
+        # For general messages, classify the query.
+        conversation_history.setdefault(session_id, []).append(("user", message))
+        classification = classify_query(message)
+        print(f"DEBUG: User message classified as: {classification}")
+        
+        if classification == "research":
+            answer = answer_question(message, session_id)
+            conversation_history.setdefault(session_id, []).append(("bot", answer))
+            return jsonify({"text": answer, "session_id": session_id})
+        elif classification == "greeting":
+            # Return the desired greeting message.
+            greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
+            conversation_history.setdefault(session_id, []).append(("bot", greeting_msg))
+            return jsonify(build_interactive_response(greeting_msg, session_id))
+        else:
+            concise_summary = generate_summary_response(
+                "Provide a 1-2 sentence summary of the research paper.", session_id
+            )
+            conversation_history.setdefault(session_id, []).append(("bot", concise_summary))
+            summary_text = (
+                f"Summary: {concise_summary}\n\n"
+                "Would you like a detailed summary of the abstract or full paper?\n"
+                "Or ask a specific question."
+            )
+            return jsonify(build_interactive_response(summary_text, session_id))
 
 @app.errorhandler(404)
 def page_not_found(e):
