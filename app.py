@@ -19,7 +19,7 @@ app = Flask(__name__)
 conversation_history = {}
 
 # Rocket.Chat Bot Credentials & URL (set these as environment variables or hard-code for testing)
-ROCKET_CHAT_URL = os.getenv("https://chat.genaiconnect.net/api/v1/chat.postMessage")
+ROCKET_CHAT_URL = "https://chat.genaiconnect.net/api/v1/chat.postMessage"
 BOT_USER_ID = os.getenv("botUserId")
 BOT_AUTH_TOKEN = os.getenv("botToken")
 
