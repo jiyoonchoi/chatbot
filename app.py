@@ -19,7 +19,7 @@ app = Flask(__name__)
 conversation_history = {}
 
 # Rocket.Chat Bot Credentials & URL
-ROCKET_CHAT_URL = "https://chat.genaiconnect.net/api/v1/chat.postMessage"
+ROCKET_CHAT_URL = "https://chat.genaiconnect.net"
 BOT_USER_ID = os.getenv("botUserId")
 BOT_AUTH_TOKEN = os.getenv("botToken")
 
@@ -180,7 +180,7 @@ def query():
     message = data.get("text", "").strip()
     
     # Extract room id if provided (for typing indicator)
-    room_id = data.get("rid")
+    room_id = data.get("roomId") or data.get("rid")
     print(f"DEBUG: User: {user}, Message: {message}, Room ID: {room_id}")
     
     # Ignore bot messages or empty text.
