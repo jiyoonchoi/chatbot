@@ -1,6 +1,7 @@
 import os
 import uuid
 import time
+import requests
 from flask import Flask, request, jsonify
 from llmproxy import generate, pdf_upload
 from dotenv import load_dotenv
@@ -16,6 +17,28 @@ app = Flask(__name__)
 
 # Global conversation history.
 conversation_history = {}
+
+# Rocket.Chat Bot Credentials & URL (set these as environment variables or hard-code for testing)
+ROCKET_CHAT_URL = os.getenv("https://chat.genaiconnect.net/api/v1/chat.postMessage")
+BOT_USER_ID = os.getenv("botUserId")
+BOT_AUTH_TOKEN = os.getenv("botToken")
+
+def send_typing_indicator(room_id):
+    """
+    Sends a typing indicator to Rocket.Chat.
+    """
+    headers = {
+        "X-Auth-Token": BOT_AUTH_TOKEN,
+        "X-User-Id": BOT_USER_ID,
+        "Content-type": "application/json",
+    }
+    payload = {"roomId": room_id}
+    url = f"{ROCKET_CHAT_URL}/api/v1/chat.sendTyping"
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        print(f"DEBUG: Typing indicator response: {response.json()}")
+    except Exception as e:
+        print(f"DEBUG: Error sending typing indicator: {e}")
 
 def get_session_id(data):
     """
@@ -75,7 +98,8 @@ def summarizing_agent(action_type, session_id):
     else:
         return "Invalid summarization action."
     
-    time.sleep(10)  # Ensure PDF is processed
+    # Send typing indicator before processing.
+    time.sleep(10)  # Simulate processing delay (PDF processing)
     return generate_summary_response(prompt, session_id)
 
 def answer_question(question, session_id):
@@ -155,9 +179,16 @@ def query():
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
     
+    # Extract room id if provided (for typing indicator)
+    room_id = data.get("rid")
+    
     # Ignore bot messages or empty text.
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
+    
+    # Trigger the typing indicator if room id and credentials are available.
+    if room_id:
+        send_typing_indicator(room_id)
     
     print(f"Message from {user}: {message}")
     session_id = get_session_id(data)
@@ -181,7 +212,6 @@ def query():
             conversation_history.setdefault(session_id, []).append(("bot", answer))
             return jsonify({"text": answer, "session_id": session_id})
         elif classification == "greeting":
-            # Return the desired greeting message.
             greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
             conversation_history.setdefault(session_id, []).append(("bot", greeting_msg))
             return jsonify(build_interactive_response(greeting_msg, session_id))
