@@ -11,7 +11,7 @@ load_dotenv()
 
 # Get the directory of the current script and build an absolute path to the PDF.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PDF_PATH = os.path.join(os.getcwd(), 'static', 'pdfs', 'research_paper.pdf')
+PDF_PATH = os.path.join(os.getcwd(), 'static', 'pdfs', 'twips_paper.pdf')
 
 app = Flask(__name__)
 
@@ -69,7 +69,7 @@ def generate_summary_response(prompt, session_id):
         system="You are a TA chatbot for CS-150: Generative AI for Social Impact.",
         query=prompt,
         temperature=0.0,
-        lastk=0,
+        lastk=5,
         session_id=session_id,
         rag_usage=True,
         rag_threshold=0.3,
@@ -124,7 +124,7 @@ def classify_query(message):
     """
     prompt = (
         "Determine if the following message is a greeting, a query about the research paper, or something else. "
-        "Reply with one word: 'greeting', 'research', or 'other'.\n\n"
+        "Reply with one word: 'greeting' or 'not greeting'.\n\n"
         f"Message: \"{message}\""
     )
     print(f"DEBUG: Classifying query: {message}")
@@ -209,7 +209,7 @@ def query():
         classification = classify_query(message)
         print(f"DEBUG: User message classified as: {classification}")
         
-        if classification == "research":
+        if classification == "not greeting":
             answer = answer_question(message, session_id)
             conversation_history.setdefault(session_id, []).append(("bot", answer))
             return jsonify({"text": answer, "session_id": session_id})
@@ -217,17 +217,17 @@ def query():
             greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
             conversation_history.setdefault(session_id, []).append(("bot", greeting_msg))
             return jsonify(build_interactive_response(greeting_msg, session_id))
-        else:
-            concise_summary = generate_summary_response(
-                "Provide a 1-2 sentence summary of the research paper.", session_id
-            )
-            conversation_history.setdefault(session_id, []).append(("bot", concise_summary))
-            summary_text = (
-                f"Summary: {concise_summary}\n\n"
-                "Would you like a detailed summary of the abstract or full paper?\n"
-                "Or ask a specific question."
-            )
-            return jsonify(build_interactive_response(summary_text, session_id))
+        # else:
+        #     concise_summary = generate_summary_response(
+        #         "Provide a 1-2 sentence summary of the research paper.", session_id
+        #     )
+        #     conversation_history.setdefault(session_id, []).append(("bot", concise_summary))
+        #     summary_text = (
+        #         f"Summary: {concise_summary}\n\n"
+        #         "Would you like a detailed summary of the abstract or full paper?\n"
+        #         "Or ask a specific question."
+        #     )
+        #     return jsonify(build_interactive_response(summary_text, session_id))
 
 @app.errorhandler(404)
 def page_not_found(e):
