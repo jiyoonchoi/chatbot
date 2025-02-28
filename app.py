@@ -11,7 +11,7 @@ load_dotenv()
 
 # Get the directory of the current script and build an absolute path to the PDF.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PDF_PATH = os.path.join(BASE_DIR, "research_paper.pdf")
+PDF_PATH = os.path.join(os.getcwd(), 'static', 'pdfs', 'research_paper.pdf')
 
 app = Flask(__name__)
 
