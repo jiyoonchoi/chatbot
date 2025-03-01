@@ -214,7 +214,13 @@ def build_interactive_response(response_text, session_id):
         ]
     }
 
+@app.route('/', methods=['GET', 'POST'])
+
+def welcome():
+   return jsonify({"text": 'Hi there! How can I help you today?'})
+
 @app.route('/query', methods=['POST'])
+
 def query():
     data = request.get_json() or request.form  # Support JSON and form data
     print(f"DEBUG: Received request data: {data}")
@@ -300,7 +306,7 @@ def query():
         #         "Or ask a specific question."
         #     )
         #     return jsonify(build_interactive_response(summary_text, session_id))
-        return jsonify({"text": "Sorry, I didn't understand that.", "session_id": session_id})
+    return jsonify({"text": "Sorry, I didn't understand that.", "session_id": session_id})
 
 @app.errorhandler(404)
 def page_not_found(e):
