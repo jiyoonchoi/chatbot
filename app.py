@@ -133,8 +133,9 @@ def send_direct_message_to_TA(question, session_id):
         "X-User-Id": BOT_USER_ID,
     }
     
-    student = session_id[len("session_"):]
-    message_text = f"Student '{student}' asks: {question}"
+    # student = session_id[len("session_"):]
+    student = session_id
+    message_text = f"A student in CS150: '{student}' asks: \"{question}\""
     
     payload = {
         "channel": f"@{ta_username}",
@@ -143,6 +144,8 @@ def send_direct_message_to_TA(question, session_id):
     
     try:
         response = requests.post(msg_url, json=payload, headers=headers)
+        print("DEBUG: Would send direct message with payload:")
+        print(payload)
         print("DEBUG: Direct message sent:", response.json())
     except Exception as e:
         print("DEBUG: Error sending direct message to TA:", e)
@@ -248,13 +251,13 @@ def query():
         conversation_history[session_id] = {"messages": [], "awaiting_ta_question": False}
 
     # Check if we are awaiting a question for TA
-    if conversation_history[session_id].get("awaiting_ta_question", False): # **********
-        # Process this message as the TA question.
-        ta_question = message  # The message is the question.
-        send_direct_message_to_TA(ta_question, user)  
-        confirmation = "Your TA question has been forwarded. They will get back to you soon."
+    if conversation_history[session_id].get("awaiting_ta_question", False): 
+        # Process message as the student question.
+        question_to_ta = message  
+        send_direct_message_to_TA(question_to_ta, user)  
+        confirmation = f"Your question to TA, {TA_USERNAME}, has been forwarded. They will get back to you soon."
         # Reset the waiting flag.
-        conversation_history[session_id]["awaiting_ta_question"] = False # **********
+        conversation_history[session_id]["awaiting_ta_question"] = False 
         return jsonify({"text": confirmation, "session_id": session_id})
     
     # If the message is exactly "summarize_abstract" or "summarize_full", handle the summarization button clicks.
@@ -268,13 +271,12 @@ def query():
     
     # send a direct message to the TA.
     elif message == "ask_TA":
-        prompt = "Please type your question for your TA."
-        conversation_history[session_id]["awaiting_ta_question"] = True # **********
+        prompt = f"Please type your question for your TA, {TA_USERNAME}."
+        conversation_history[session_id]["awaiting_ta_question"] = True 
         return jsonify({"text": prompt, "session_id": session_id})
     
     else:
         # For general messages, classify the query.
-        # conversation_history.setdefault(session_id, {"messages": [], "awaiting_ta_question": False})
         conversation_history[session_id]["messages"].append(("user", message))
        
         classification = classify_query(message)
@@ -282,9 +284,7 @@ def query():
         
         if classification == "not greeting":
             answer = answer_question(message, session_id)
-            # conversation_history.setdefault(session_id, []).append(("bot", answer))
-
-            # conversation_history.setdefault(session_id, {"messages": [], "awaiting_ta_question": False})
+        
             conversation_history[session_id]["messages"].append(("bot", answer))
             return jsonify({"text": answer, "session_id": session_id})
         
@@ -292,7 +292,6 @@ def query():
         elif classification == "greeting":
             greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
            
-            # conversation_history.setdefault(session_id, {"messages": [], "awaiting_ta_question": False})
             conversation_history[session_id]["messages"].append(("bot", greeting_msg))
             return jsonify(build_interactive_response(greeting_msg, session_id))
         # else:
@@ -306,7 +305,7 @@ def query():
         #         "Or ask a specific question."
         #     )
         #     return jsonify(build_interactive_response(summary_text, session_id))
-    return jsonify({"text": "Sorry, I didn't understand that.", "session_id": session_id})
+    # return jsonify({"text": "Sorry, I didn't understand that.", "session_id": session_id})
 
 @app.errorhandler(404)
 def page_not_found(e):
