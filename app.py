@@ -242,13 +242,12 @@ def query():
         conversation_history[session_id] = {"messages": [], "awaiting_ta_question": False}
 
     # Check if we are awaiting a question for TA
-    if conversation_history[session_id].get("awaiting_ta_question", False): # **********
-        # Process this message as the TA question.
-        ta_question = message  # The message is the question.
+    if conversation_history[session_id].get("awaiting_ta_question", False): 
+        ta_question = message 
         send_direct_message_to_TA(ta_question, user)  
         confirmation = "Your TA question has been forwarded. They will get back to you soon."
         # Reset the waiting flag.
-        conversation_history[session_id]["awaiting_ta_question"] = False # **********
+        conversation_history[session_id]["awaiting_ta_question"] = False 
         return jsonify({"text": confirmation, "session_id": session_id})
     
     # If the message is exactly "summarize_abstract" or "summarize_full", handle the summarization button clicks.
@@ -263,7 +262,7 @@ def query():
     # send a direct message to the TA.
     elif message == "ask_TA":
         prompt = "Please type your question for your TA."
-        conversation_history[session_id]["awaiting_ta_question"] = True # **********
+        conversation_history[session_id]["awaiting_ta_question"] = True 
         return jsonify({"text": prompt, "session_id": session_id})
     
     else:
@@ -276,17 +275,11 @@ def query():
         
         if classification == "not greeting":
             answer = answer_question(message, session_id)
-            # conversation_history.setdefault(session_id, []).append(("bot", answer))
-
-            # conversation_history.setdefault(session_id, {"messages": [], "awaiting_ta_question": False})
             conversation_history[session_id]["messages"].append(("bot", answer))
             return jsonify({"text": answer, "session_id": session_id})
-        
-        
+           
         elif classification == "greeting":
             greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
-           
-            # conversation_history.setdefault(session_id, {"messages": [], "awaiting_ta_question": False})
             conversation_history[session_id]["messages"].append(("bot", greeting_msg))
             return jsonify(build_interactive_response(greeting_msg, session_id))
         # else:
