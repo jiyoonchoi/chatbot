@@ -22,7 +22,8 @@ conversation_history = {}
 ROCKET_CHAT_URL = "https://chat.genaiconnect.net"
 BOT_USER_ID = os.getenv("botUserId")
 BOT_AUTH_TOKEN = os.getenv("botToken")
-TA_USERNAME = os.getenv("taUserName")
+# TA_USERNAME = os.getenv("taUserName")
+TA_USERNAME = "aya.ismail"
 MSG_ENDPOINT = os.getenv("msgEndPoint")
 
 # TODO: NOT WORKING
