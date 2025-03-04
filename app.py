@@ -222,8 +222,8 @@ def build_interactive_response(response_text, session_id):
 def welcome():
    return jsonify({"text": 'Hi there! How can I help you today?'})
 
-@app.route('/', methods=['POST'])
-# @app.route('/query', methods=['POST'])
+# @app.route('/', methods=['POST'])
+@app.route('/query', methods=['POST'])
 
 def query():
     data = request.get_json() or request.form  # Support JSON and form data
