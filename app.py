@@ -22,6 +22,8 @@ conversation_history = {}
 ROCKET_CHAT_URL = "https://chat.genaiconnect.net"
 BOT_USER_ID = os.getenv("botUserId")
 BOT_AUTH_TOKEN = os.getenv("botToken")
+TA_USERNAME = os.getenv("taUserName")
+MSG_ENDPOINT = os.getenv("msgEndPoint")
 
 # TODO: NOT WORKING
 def send_typing_indicator(room_id):
@@ -60,9 +62,10 @@ def upload_pdf_if_needed(pdf_path, session_id):
     print(f"DEBUG: Upload response: {response}")
     return "Successfully uploaded" in response
 
-def generate_summary_response(prompt, session_id):
+def generate_response(prompt, session_id):
     """
     Calls generate with the given prompt and session_id.
+    currently used to summrize abstract/full paper and answer questions 
     """
     response = generate(
         model='4o-mini',
@@ -101,7 +104,7 @@ def summarizing_agent(action_type, session_id):
     
     # Send typing indicator before processing.
     time.sleep(10)  # Simulate processing delay (PDF processing)
-    return generate_summary_response(prompt, session_id)
+    return generate_response(prompt, session_id)
 
 def answer_question(question, session_id):
     """
@@ -116,7 +119,34 @@ def answer_question(question, session_id):
         "Provide the answer using only the content of the uploaded PDF."
     )
     time.sleep(10)
-    return generate_summary_response(prompt, session_id)
+    return generate_response(prompt, session_id)
+
+def send_direct_message_to_TA(question, session_id):
+    """
+    Sends a direct message to the TA with the student's question.
+    """
+    ta_username = TA_USERNAME  
+    msg_url = MSG_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "X-Auth-Token": BOT_AUTH_TOKEN,
+        "X-User-Id": BOT_USER_ID,
+    }
+    
+    student = session_id[len("session_"):]
+    message_text = f"Student '{student}' asks: {question}"
+    
+    payload = {
+        "channel": f"@{ta_username}",
+        "text": message_text
+    }
+    
+    try:
+        response = requests.post(msg_url, json=payload, headers=headers)
+        print("DEBUG: Direct message sent:", response.json())
+    except Exception as e:
+        print("DEBUG: Error sending direct message to TA:", e)
+
 
 def classify_query(message):
     """
@@ -167,6 +197,19 @@ def build_interactive_response(response_text, session_id):
                         "msg_processing_type": "sendMessage"
                     }
                 ]
+            }, 
+            {
+                "title": "Ask a TA",
+                "text": "Do you have a question for your TA?", 
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Ask a TA",
+                        "msg": "ask_TA",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
             }
         ]
     }
@@ -194,6 +237,18 @@ def query():
     
     print(f"Message from {user}: {message}")
     session_id = get_session_id(data)
+
+    if session_id not in conversation_history:
+        conversation_history[session_id] = {"messages": [], "awaiting_ta_question": False}
+
+    # Check if we are awaiting a question for TA
+    if conversation_history[session_id].get("awaiting_ta_question", False): 
+        ta_question = message 
+        send_direct_message_to_TA(ta_question, user)  
+        confirmation = "Your TA question has been forwarded. They will get back to you soon."
+        # Reset the waiting flag.
+        conversation_history[session_id]["awaiting_ta_question"] = False 
+        return jsonify({"text": confirmation, "session_id": session_id})
     
     # If the message is exactly "summarize_abstract" or "summarize_full", handle the summarization button clicks.
     if message == "summarize_abstract":
@@ -203,19 +258,29 @@ def query():
     elif message == "summarize_full":
         summary_text = summarizing_agent("summarize_full", session_id)
         return jsonify({"text": summary_text, "session_id": session_id})
+    
+    # send a direct message to the TA.
+    elif message == "ask_TA":
+        prompt = "Please type your question for your TA."
+        conversation_history[session_id]["awaiting_ta_question"] = True 
+        return jsonify({"text": prompt, "session_id": session_id})
+    
     else:
         # For general messages, classify the query.
-        conversation_history.setdefault(session_id, []).append(("user", message))
+        # conversation_history.setdefault(session_id, {"messages": [], "awaiting_ta_question": False})
+        conversation_history[session_id]["messages"].append(("user", message))
+       
         classification = classify_query(message)
         print(f"DEBUG: User message classified as: {classification}")
         
         if classification == "not greeting":
             answer = answer_question(message, session_id)
-            conversation_history.setdefault(session_id, []).append(("bot", answer))
+            conversation_history[session_id]["messages"].append(("bot", answer))
             return jsonify({"text": answer, "session_id": session_id})
+           
         elif classification == "greeting":
             greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
-            conversation_history.setdefault(session_id, []).append(("bot", greeting_msg))
+            conversation_history[session_id]["messages"].append(("bot", greeting_msg))
             return jsonify(build_interactive_response(greeting_msg, session_id))
         # else:
         #     concise_summary = generate_summary_response(
@@ -228,6 +293,7 @@ def query():
         #         "Or ask a specific question."
         #     )
         #     return jsonify(build_interactive_response(summary_text, session_id))
+        return jsonify({"text": "Sorry, I didn't understand that.", "session_id": session_id})
 
 @app.errorhandler(404)
 def page_not_found(e):
