@@ -22,8 +22,7 @@ conversation_history = {}
 ROCKET_CHAT_URL = "https://chat.genaiconnect.net"
 BOT_USER_ID = os.getenv("botUserId")
 BOT_AUTH_TOKEN = os.getenv("botToken")
-# TA_USERNAME = os.getenv("taUserName")
-TA_USERNAME = "aya.ismail"
+TA_USERNAME = os.getenv("taUserName")
 MSG_ENDPOINT = os.getenv("msgEndPoint")
 
 # TODO: NOT WORKING
@@ -133,16 +132,13 @@ def send_direct_message_to_TA(question, session_id):
         "X-Auth-Token": BOT_AUTH_TOKEN,
         "X-User-Id": BOT_USER_ID,
     }
-    
-    # student = session_id[len("session_"):]
     student = session_id
     message_text = f"A student in CS150: '{student}' asks: \"{question}\""
     
     payload = {
         "channel": f"@{ta_username}",
         "text": message_text
-    }
-    
+    }   
     try:
         response = requests.post(msg_url, json=payload, headers=headers)
         print("DEBUG: Would send direct message with payload:")
@@ -218,12 +214,6 @@ def build_interactive_response(response_text, session_id):
         ]
     }
 
-@app.route('/', methods=['GET', 'POST'])
-
-def welcome():
-   return jsonify({"text": 'Hi there! How can I help you today?'})
-
-# @app.route('/', methods=['POST'])
 @app.route('/query', methods=['POST'])
 
 def query():
@@ -252,9 +242,8 @@ def query():
     if session_id not in conversation_history:
         conversation_history[session_id] = {"messages": [], "awaiting_ta_question": False}
 
-    # Check if we are awaiting a question for TA
+    # Check if we are waiting for a question to send to TA
     if conversation_history[session_id].get("awaiting_ta_question", False): 
-        # Process message as the student question.
         question_to_ta = message  
         send_direct_message_to_TA(question_to_ta, user)  
         confirmation = f"Your question to TA, {TA_USERNAME}, has been forwarded. They will get back to you soon."
@@ -289,8 +278,7 @@ def query():
         
             conversation_history[session_id]["messages"].append(("bot", answer))
             return jsonify({"text": answer, "session_id": session_id})
-        
-        
+          
         elif classification == "greeting":
             greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
            
