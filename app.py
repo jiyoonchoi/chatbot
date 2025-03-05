@@ -20,9 +20,9 @@ conversation_history = {}
 
 # Rocket.Chat Bot Credentials & URL
 ROCKET_CHAT_URL = "https://chat.genaiconnect.net"
-BOT_USER_ID = os.getenv("botUserId")
-BOT_AUTH_TOKEN = os.getenv("botToken")
-TA_USERNAME = os.getenv("taUserName")
+BOT_USER_ID = "Q3ZES5kent3RrMR6A"
+BOT_AUTH_TOKEN = "7chsf5naw86qDQ8luzi3kz4oGoi1uooY72TPZhHsUPS"
+TA_USERNAME = "jiyoon.choi"
 MSG_ENDPOINT = os.getenv("msgEndPoint")
 
 # TODO: NOT WORKING
@@ -242,11 +242,12 @@ def query():
     if session_id not in conversation_history:
         conversation_history[session_id] = {"messages": [], "awaiting_ta_question": False}
 
-    # Check if we are waiting for a question to send to TA
-    if conversation_history[session_id].get("awaiting_ta_question", False): 
-        question_to_ta = message  
-        send_direct_message_to_TA(question_to_ta, user)  
-        confirmation = f"Your question to TA, {TA_USERNAME}, has been forwarded. They will get back to you soon."
+    # Check if we are awaiting a question for TA
+    if conversation_history[session_id].get("awaiting_ta_question", False): # **********
+        # Process this message as the TA question.
+        ta_question = message  # The message is the question.
+        send_direct_message_to_TA(ta_question, user)  
+        confirmation = "Your TA question has been forwarded. They will get back to you soon."
         # Reset the waiting flag.
         conversation_history[session_id]["awaiting_ta_question"] = False 
         return jsonify({"text": confirmation, "session_id": session_id})
@@ -262,8 +263,8 @@ def query():
     
     # send a direct message to the TA.
     elif message == "ask_TA":
-        prompt = f"Please type your question for your TA, {TA_USERNAME}."
-        conversation_history[session_id]["awaiting_ta_question"] = True 
+        prompt = "Please type your question for your TA."
+        conversation_history[session_id]["awaiting_ta_question"] = True # **********
         return jsonify({"text": prompt, "session_id": session_id})
     
     else:
@@ -275,13 +276,17 @@ def query():
         
         if classification == "not greeting":
             answer = answer_question(message, session_id)
-        
+            # conversation_history.setdefault(session_id, []).append(("bot", answer))
+
+            # conversation_history.setdefault(session_id, {"messages": [], "awaiting_ta_question": False})
             conversation_history[session_id]["messages"].append(("bot", answer))
             return jsonify({"text": answer, "session_id": session_id})
-          
+        
+        
         elif classification == "greeting":
             greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
            
+            # conversation_history.setdefault(session_id, {"messages": [], "awaiting_ta_question": False})
             conversation_history[session_id]["messages"].append(("bot", greeting_msg))
             return jsonify(build_interactive_response(greeting_msg, session_id))
         # else:
