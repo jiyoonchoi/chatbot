@@ -261,7 +261,7 @@ def query():
     
     # send a direct message to the TA.
     elif message == "ask_TA":
-        prompt = "Please type your question for your TA."
+        prompt = "Please type your question for your TA!"
         conversation_history[session_id]["awaiting_ta_question"] = True 
         return jsonify({"text": prompt, "session_id": session_id})
     
