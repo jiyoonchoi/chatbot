@@ -23,7 +23,7 @@ ROCKET_CHAT_URL = "https://chat.genaiconnect.net"
 BOT_USER_ID = "Q3ZES5kent3RrMR6A"
 BOT_AUTH_TOKEN = "7chsf5naw86qDQ8luzi3kz4oGoi1uooY72TPZhHsUPS"
 TA_USERNAME = "jiyoon.choi"
-MSG_ENDPOINT = os.getenv("msgEndPoint")
+MSG_ENDPOINT = "https://chat.genaiconnect.net/api/v1/chat.postMessage"
 
 # TODO: NOT WORKING
 def send_typing_indicator(room_id):
