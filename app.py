@@ -238,6 +238,8 @@ def query():
     print(f"Message from {user}: {message}")
     session_id = get_session_id(data)
 
+    # conversation_history[session_id]["awaiting_ta_question"] = True 
+
     if session_id not in conversation_history:
         conversation_history[session_id] = {"messages": [], "awaiting_ta_question": False}
 
@@ -245,7 +247,7 @@ def query():
     if conversation_history[session_id].get("awaiting_ta_question", False): 
         ta_question = message 
         send_direct_message_to_TA(ta_question, user)  
-        confirmation = "Your TA question has been forwarded. They will get back to you soon."
+        confirmation = f"Your TA question has been forwarded to {TA_USERNAME}. They will get back to you soon."
         # Reset the waiting flag.
         conversation_history[session_id]["awaiting_ta_question"] = False 
         return jsonify({"text": confirmation, "session_id": session_id})
