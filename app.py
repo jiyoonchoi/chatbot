@@ -20,10 +20,10 @@ conversation_history = {}
 
 # Rocket.Chat Bot Credentials & URL
 ROCKET_CHAT_URL = "https://chat.genaiconnect.net"
-BOT_USER_ID = load_dotenv("botUserId")
-BOT_AUTH_TOKEN = load_dotenv("botToken")
-TA_USERNAME = load_dotenv("taUserName")
-MSG_ENDPOINT = load_dotenv("msgEndpoint")
+BOT_USER_ID = os.getenv("botUserId")
+BOT_AUTH_TOKEN = os.getenv("botToken")
+TA_USERNAME = os.getenv("taUserName")
+MSG_ENDPOINT = os.getenv("msgEndpoint")
 
 # TODO: NOT WORKING
 def send_typing_indicator(room_id):
@@ -206,7 +206,7 @@ def build_interactive_response(response_text, session_id):
                         "type": "button",
                         "text": "Ask TA",
                         "msg": "ask_TA",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     }
                 ]
