@@ -141,6 +141,7 @@ def send_direct_message_to_TA(question, session_id):
     }   
     try:
         response = requests.post(msg_url, json=payload, headers=headers)
+        print("DEBUG: msgEndPoint:", os.getenv("msgEndPoint"))  # Specifically check msgEndPoint
         print("DEBUG: Would send direct message with payload:")
         print(payload)
         print("DEBUG: Direct message sent:", response.json())
