@@ -179,6 +179,37 @@ def classify_query(message):
     )
     return classification.get('response', '').strip().lower() if isinstance(classification, dict) else classification.strip().lower()
 
+def build_response(response_text, session_id):
+    """
+    Builds a response payload with Ask TA buttons for all queries.
+    """
+    return {
+        "text": response_text, 
+        "session_id": session_id, 
+        "attachments": 
+        [
+            {
+                "title": "Ask TA",
+                "text": "Need help? Ask a TA", 
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Ask your TA Aya",
+                        "msg": "ask_Aya",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }, 
+                    {
+                        "type": "button",
+                        "text": "Ask your TA Jiyoon",
+                        "msg": "ask_Jiyoon",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            }
+        ]
+    }
 def build_interactive_response(response_text, session_id):
     """
     Builds a response payload with interactive buttons for further options.
@@ -302,11 +333,8 @@ def query():
         
         if classification == "not greeting":
             answer = answer_question(message, session_id)
-            # conversation_history.setdefault(session_id, []).append(("bot", answer))
-
-            # conversation_history.setdefault(session_id, {"messages": [], "awaiting_ta_question": False})
             conversation_history[session_id]["messages"].append(("bot", answer))
-            return jsonify({"text": answer, "session_id": session_id})
+            return jsonify(build_response(answer, session_id))
         
         
         elif classification == "greeting":
