@@ -207,7 +207,7 @@ def build_interactive_response(response_text, session_id):
                     {
                         "type": "button",
                         "text": "Ask TA",
-                        "msg": "ask_TA",
+                        "msg": "show TA menu",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
