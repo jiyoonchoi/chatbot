@@ -22,8 +22,8 @@ conversation_history = {}
 ROCKET_CHAT_URL = "https://chat.genaiconnect.net"
 BOT_USER_ID = os.getenv("botUserId")
 BOT_AUTH_TOKEN = os.getenv("botToken")
-TA_USERNAME = os.getenv("taUserName")
-# MSG_ENDPOINT = os.getenv("msgEndpoint")
+TA_USERNAME_1 = os.getenv("taUserName1")
+TA_USERNAME_2 = os.getenv("taUserName2")
 MSG_ENDPOINT = os.getenv("msgEndPoint", "https://chat.genaiconnect.net/api/v1/chat.postMessage")
 
 # TODO: NOT WORKING
@@ -122,11 +122,17 @@ def answer_question(question, session_id):
     time.sleep(10)
     return generate_response(prompt, session_id)
 
-def send_direct_message_to_TA(question, session_id):
+def send_direct_message_to_TA(question, session_id, selected_ta):
     """
     Sends a direct message to the TA with the student's question.
     """
-    ta_username = TA_USERNAME  
+    
+    ta_username = selected_ta
+    print(f"DEBUG: Sending direct message to TA: {ta_username} with question: {question}")
+    
+    if not ta_username:
+        return "No TA selected for this session."
+     
     msg_url = MSG_ENDPOINT
     headers = {
         "Content-Type": "application/json",
@@ -206,15 +212,15 @@ def build_interactive_response(response_text, session_id):
                 "actions": [
                     {
                         "type": "button",
-                        "text": "Ask Aya",
+                        "text": "Ask your TA Aya",
                         "msg": "ask_Aya",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }, 
                     {
                         "type": "button",
-                        "text": "Ask Aya 2",
-                        "msg": "ask_Aya2",
+                        "text": "Ask your TA Jiyoon",
+                        "msg": "ask_Jiyoon",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
@@ -252,13 +258,17 @@ def query():
         conversation_history[session_id] = {"messages": [], "awaiting_ta_question": False}
 
     # Check if we are awaiting a question for TA
-    if conversation_history[session_id].get("awaiting_ta_question", False): # **********
-        # Process this message as the TA question.
+    if conversation_history[session_id].get("awaiting_ta_question", False): 
+       
         ta_question = message  # The message is the question.
-        send_direct_message_to_TA(ta_question, user)  
-        confirmation = "Your TA question has been forwarded. They will get back to you soon."
-        # Reset the waiting flag.
+        selected_ta = conversation_history[session_id].get("selected_ta", "your TA")  # Default fallback
+        print(f"DEBUG: Before Sending question to TA: {selected_ta} - {ta_question}")
+        send_direct_message_to_TA(ta_question, user, selected_ta) 
+        confirmation = f"Your question has been sent to {selected_ta}. \n\n**Question:** \"{ta_question}\"\n\nThey will get back to you soon!"
+    
+        # Reset flags
         conversation_history[session_id]["awaiting_ta_question"] = False 
+        # conversation_history[session_id]["selected_ta"] = None  
         return jsonify({"text": confirmation, "session_id": session_id})
     
     # If the message is exactly "summarize_abstract" or "summarize_full", handle the summarization button clicks.
@@ -271,9 +281,16 @@ def query():
         return jsonify({"text": summary_text, "session_id": session_id})
     
     # send a direct message to the TA.
-    elif message == "ask_TA":
-        prompt = "Please type your question for your TA."
-        conversation_history[session_id]["awaiting_ta_question"] = True # **********
+    elif message == "ask_Aya":
+        prompt = "Please type your question for your TA Aya."
+        conversation_history[session_id]["selected_ta"] = TA_USERNAME_1  # Store selected TA
+        conversation_history[session_id]["awaiting_ta_question"] = True
+        return jsonify({"text": prompt, "session_id": session_id})
+        
+    elif message == "ask_Jiyoon": 
+        prompt = "Please type your question for your TA Jiyoon."
+        conversation_history[session_id]["selected_ta"] = TA_USERNAME_2  # Store selected TA
+        conversation_history[session_id]["awaiting_ta_question"] = True
         return jsonify({"text": prompt, "session_id": session_id})
     
     else:
