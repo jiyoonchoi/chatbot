@@ -206,8 +206,15 @@ def build_interactive_response(response_text, session_id):
                 "actions": [
                     {
                         "type": "button",
-                        "text": "Ask TA",
-                        "msg": "show TA menu",
+                        "text": "Ask Aya",
+                        "msg": "ask_Aya",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }, 
+                    {
+                        "type": "button",
+                        "text": "Ask Aya 2",
+                        "msg": "ask_Aya2",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
