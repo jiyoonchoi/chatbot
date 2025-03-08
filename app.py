@@ -190,7 +190,7 @@ def build_response(response_text, session_id):
         [
             {
                 "title": "Ask TA",
-                "text": "Need help? Ask a TA", 
+                "text": "Need help?", 
                 "actions": [
                     {
                         "type": "button",
@@ -239,7 +239,7 @@ def build_interactive_response(response_text, session_id):
             }, 
             {
                 "title": "Ask TA",
-                "text": "Do you have a question for your TA?", 
+                "text": "Need Help?", 
                 "actions": [
                     {
                         "type": "button",
