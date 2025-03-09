@@ -281,8 +281,7 @@ def build_menu_response():
         "text": "Select an option:",
         "attachments": [
             {
-                "title": "Would you like a summary?",
-                "text": "Select an option:",
+                "title": "Select an option:",
                 "actions": [
                     {
                         "type": "button",
@@ -297,12 +296,18 @@ def build_menu_response():
                         "msg": "summarize_full",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Ask a TA",
+                        "msg": "ask_TA",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
                     }
                 ]
             },
             {
-                "title": "Ask a TA",
-                "text": "Do you have a question for your TA?",
+                "title": "Do you have a question for your TA?",
                 "actions": [
                     {
                         "type": "button",
@@ -330,22 +335,20 @@ def build_menu_response():
     }
 
 def add_menu_button(response_payload):
-    """ Adds a menu button to all responses. """
-    menu_attachment = {
-        "actions": [
-            {
-                "type": "button",
-                "text": "Menu",
-                "msg": "menu",
-                "msg_in_chat_window": True,
-                "msg_processing_type": "sendMessage"
-            }
-        ]
-    }
-    if "attachments" in response_payload:
-        response_payload["attachments"].append(menu_attachment)
-    else:
-        response_payload["attachments"] = [menu_attachment]
+    # Replace any attachments with just the Menu button
+    response_payload["attachments"] = [
+        {
+            "actions": [
+                {
+                    "type": "button",
+                    "text": "Menu",
+                    "msg": "menu",
+                    "msg_in_chat_window": True,
+                    "msg_processing_type": "sendMessage"
+                }
+            ]
+        }
+    ]
     return response_payload
 
 @app.route('/query', methods=['POST'])
@@ -356,21 +359,17 @@ def query():
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
     
-    # room_id = data.get("roomId") or data.get("rid")
-    # print(f"DEBUG: User: {user}, Message: {message}, Room ID: {room_id}")
-    
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
-    
-    # if room_id:
-    #     send_typing_indicator(room_id)
     
     print(f"Message from {user}: {message}")
     session_id = get_session_id(data)
     
+    # Initialize conversation if not present.
     if session_id not in conversation_history:
         conversation_history[session_id] = {"messages": [], "awaiting_ta_question": False}
     
+    # Clear history command: clear conversation and caches.
     if message == "clear_history":
         if session_id in conversation_history:
             del conversation_history[session_id]
@@ -381,7 +380,8 @@ def query():
         if session_id in pdf_ready:
             del pdf_ready[session_id]
         return jsonify(add_menu_button({"text": "Your conversation history and caches have been cleared.", "session_id": session_id}))
-
+    
+    # If awaiting a TA question, forward it.
     if conversation_history[session_id].get("awaiting_ta_question", False):
         ta_question = message
         send_direct_message_to_TA(ta_question, user)
@@ -389,46 +389,30 @@ def query():
         payload = {"text": confirmation, "session_id": session_id}
         return jsonify(add_menu_button(payload))
     
+    # If the user clicked the Menu button, return the full interactive menu.
     if message == "menu":
         menu_response = build_menu_response()
         menu_response["session_id"] = session_id
-        return jsonify(add_menu_button(menu_response))
+        return jsonify(menu_response)
     
-    if message == "summarize_abstract":
-        summary_text = summarizing_agent("summarize_abstract", session_id)
-        payload = {"text": summary_text, "session_id": session_id}
+    # Otherwise, process the query.
+    conversation_history[session_id]["messages"].append(("user", message))
+    classification = classify_query(message)
+    print(f"DEBUG: User message classified as: {classification}")
+    
+    if classification == "not greeting":
+        answer = answer_question(message, session_id)
+        conversation_history[session_id]["messages"].append(("bot", answer))
+        payload = {"text": answer, "session_id": session_id}
         return jsonify(add_menu_button(payload))
+    elif classification == "greeting":
+        greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
+        conversation_history[session_id]["messages"].append(("bot", greeting_msg))
+        interactive_payload = build_interactive_response(greeting_msg, session_id)
+        interactive_payload["session_id"] = session_id
+        return jsonify(add_menu_button(interactive_payload))
     
-    elif message == "summarize_full":
-        summary_text = summarizing_agent("summarize_full", session_id)
-        payload = {"text": summary_text, "session_id": session_id}
-        return jsonify(add_menu_button(payload))
-    
-    elif message == "ask_TA":
-        prompt = "Please type your question for your TA."
-        conversation_history[session_id]["awaiting_ta_question"] = True
-        payload = {"text": prompt, "session_id": session_id}
-        return jsonify(add_menu_button(payload))
-    
-    else:
-        conversation_history[session_id]["messages"].append(("user", message))
-        classification = classify_query(message)
-        print(f"DEBUG: User message classified as: {classification}")
-        
-        if classification == "not greeting":
-            answer = answer_question(message, session_id)
-            conversation_history[session_id]["messages"].append(("bot", answer))
-            payload = {"text": answer, "session_id": session_id}
-            return jsonify(add_menu_button(payload))
-        elif classification == "greeting":
-            intro_summary = generate_intro_summary(session_id)
-            greeting_msg = f"Hello! Here is a one sentence summary of the paper: {intro_summary}\nPlease ask a question about the research paper, or use the buttons below for a detailed summary."
-            conversation_history[session_id]["messages"].append(("bot", greeting_msg))
-            interactive_payload = build_interactive_response(greeting_msg, session_id)
-            interactive_payload["session_id"] = session_id
-            return jsonify(add_menu_button(interactive_payload))
-
-        return jsonify(add_menu_button({"text": "Sorry, I didn't understand that.", "session_id": session_id}))
+    return jsonify(add_menu_button({"text": "Sorry, I didn't understand that.", "session_id": session_id}))
 
 @app.errorhandler(404)
 def page_not_found(e):
