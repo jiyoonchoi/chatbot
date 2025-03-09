@@ -406,13 +406,17 @@ def query():
         payload = {"text": answer, "session_id": session_id}
         return jsonify(add_menu_button(payload))
     elif classification == "greeting":
-        greeting_msg = "Hello! Please ask a question about the research paper, or use the buttons below for a detailed summary."
+        # Generate the one-sentence summary for a greeting.
+        intro_summary = generate_intro_summary(session_id)
+        greeting_msg = (f"Hello! Here is a one sentence summary of the paper: {intro_summary}\n"
+                        "Please ask a question about the research paper, or use the buttons below for a detailed summary.")
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
         interactive_payload = build_interactive_response(greeting_msg, session_id)
         interactive_payload["session_id"] = session_id
         return jsonify(add_menu_button(interactive_payload))
     
     return jsonify(add_menu_button({"text": "Sorry, I didn't understand that.", "session_id": session_id}))
+
 
 @app.errorhandler(404)
 def page_not_found(e):
