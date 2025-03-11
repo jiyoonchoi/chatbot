@@ -355,63 +355,63 @@ def add_menu_button(response_payload):
     ]
     return response_payload
 
-def build_greeting_response(response_text, session_id):
-    return {
-        "text": response_text,
-        "session_id": session_id,
-        "attachments": [
-            {
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Choose Personality",
-                        "msg": "choose_personality",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    },
-                    {
-                        "type": "button",
-                        "text": "Menu",
-                        "msg": "menu",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            }
-        ]
-    }
+# def build_greeting_response(response_text, session_id):
+#     return {
+#         "text": response_text,
+#         "session_id": session_id,
+#         "attachments": [
+#             {
+#                 "actions": [
+#                     {
+#                         "type": "button",
+#                         "text": "Choose Personality",
+#                         "msg": "choose_personality",
+#                         "msg_in_chat_window": True,
+#                         "msg_processing_type": "sendMessage"
+#                     },
+#                     {
+#                         "type": "button",
+#                         "text": "Menu",
+#                         "msg": "menu",
+#                         "msg_in_chat_window": True,
+#                         "msg_processing_type": "sendMessage"
+#                     }
+#                 ]
+#             }
+#         ]
+#     }
 
-def add_personality_button(response_payload):
-    # Replace any attachments with just the Personality button
-    response_payload["attachments"] = [
-        {
-            "actions": [
-                {
-                    "type": "button",
-                    "text": "Choose Personality",
-                    "msg": "choose_personality",
-                    "msg_in_chat_window": True,
-                    "msg_processing_type": "sendMessage"
-                }
-            ]
-        }
-    ]
-    return response_payload
+# def add_personality_button(response_payload):
+#     # Replace any attachments with just the Personality button
+#     response_payload["attachments"] = [
+#         {
+#             "actions": [
+#                 {
+#                     "type": "button",
+#                     "text": "Choose Personality",
+#                     "msg": "choose_personality",
+#                     "msg_in_chat_window": True,
+#                     "msg_processing_type": "sendMessage"
+#                 }
+#             ]
+#         }
+#     ]
+#     return response_payload
 
   
-def send_typing_indicator(room_id):
-    headers = {
-        "X-Auth-Token": BOT_AUTH_TOKEN,
-        "X-User-Id": BOT_USER_ID,
-        "Content-type": "application/json",
-    }
-    payload = {"channel_id": room_id}
-    url = f"{ROCKET_CHAT_URL}/api/v1/chat.sendTyping"
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        print(f"DEBUG: Typing indicator response: {response.json()}")
-    except Exception as e:
-        print(f"DEBUG: Error sending typing indicator: {e}")
+# def send_typing_indicator(room_id):
+#     headers = {
+#         "X-Auth-Token": BOT_AUTH_TOKEN,
+#         "X-User-Id": BOT_USER_ID,
+#         "Content-type": "application/json",
+#     }
+#     payload = {"channel_id": room_id}
+#     url = f"{ROCKET_CHAT_URL}/api/v1/chat.sendTyping"
+#     try:
+#         response = requests.post(url, json=payload, headers=headers)
+#         print(f"DEBUG: Typing indicator response: {response.json()}")
+#     except Exception as e:
+#         print(f"DEBUG: Error sending typing indicator: {e}")
 
 
 @app.route('/query', methods=['POST'])
@@ -422,7 +422,7 @@ def query():
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
     
-    room_id = data.get("channel_id")
+    # room_id = data.get("channel_id")
     
     # if data.get("text") == "debug_data":
     #     # This sends the entire request payload back to the chat.
@@ -434,9 +434,9 @@ def query():
     print(f"Message from {user}: {message}")
     session_id = get_session_id(data)
     
-    if room_id:
-        print(f"\nDEBUG: loading indicator shown\n")
-        send_typing_indicator(room_id)
+    # if room_id:
+    #     print(f"\nDEBUG: loading indicator shown\n")
+    #     send_typing_indicator(room_id)
     
     # Initialize conversation if not present.
     if session_id not in conversation_history:
@@ -468,13 +468,13 @@ def query():
         menu_response["session_id"] = session_id
         return jsonify(menu_response)
     
-    # if the user selects a personality, 
-    if message == "set_personality":
-        selected_personality = data.get("selected_option", "default")
-        conversation_history[session_id]["personality"] = selected_personality
-        confirmation = f"Personality set to: {selected_personality.capitalize()}. You may now continue your conversation."
-        payload = {"text": confirmation, "session_id": session_id}
-        return jsonify(add_menu_button(payload))
+    # # if the user selects a personality, 
+    # if message == "set_personality":
+    #     selected_personality = data.get("selected_option", "default")
+    #     conversation_history[session_id]["personality"] = selected_personality
+    #     confirmation = f"Personality set to: {selected_personality.capitalize()}. You may now continue your conversation."
+    #     payload = {"text": confirmation, "session_id": session_id}
+    #     return jsonify(add_menu_button(payload))
 
     
     # Otherwise, process the query.
@@ -494,11 +494,11 @@ def query():
                         "Please ask a question about the research paper, or use the buttons below for a detailed summary.\n"
                         "You can specify your TA's personality from the personality dropdown")
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
-        # interactive_payload = build_interactive_response(greeting_msg, session_id)
-        # interactive_payload["session_id"] = session_id
-        # return jsonify(add_menu_button(interactive_payload))
-        interactive_payload = build_greeting_response(greeting_msg, session_id)
-        return jsonify(interactive_payload)
+        interactive_payload = build_interactive_response(greeting_msg, session_id)
+        interactive_payload["session_id"] = session_id
+        return jsonify(add_menu_button(interactive_payload))
+        # interactive_payload = build_greeting_response(greeting_msg, session_id)
+        # return jsonify(interactive_payload)
         
 
     
