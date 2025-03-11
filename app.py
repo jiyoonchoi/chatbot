@@ -355,48 +355,48 @@ def add_menu_button(response_payload):
     ]
     return response_payload
 
-# def build_greeting_response(response_text, session_id):
-#     return {
-#         "text": response_text,
-#         "session_id": session_id,
-#         "attachments": [
-#             {
-#                 "actions": [
-#                     {
-#                         "type": "button",
-#                         "text": "Choose Personality",
-#                         "msg": "choose_personality",
-#                         "msg_in_chat_window": True,
-#                         "msg_processing_type": "sendMessage"
-#                     },
-#                     {
-#                         "type": "button",
-#                         "text": "Menu",
-#                         "msg": "menu",
-#                         "msg_in_chat_window": True,
-#                         "msg_processing_type": "sendMessage"
-#                     }
-#                 ]
-#             }
-#         ]
-#     }
+def build_greeting_response(response_text, session_id):
+    return {
+        "text": response_text,
+        "session_id": session_id,
+        "attachments": [
+            {
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Choose Personality",
+                        "msg": "choose_personality",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Menu",
+                        "msg": "menu",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            }
+        ]
+    }
 
-# def add_personality_button(response_payload):
-#     # Replace any attachments with just the Personality button
-#     response_payload["attachments"] = [
-#         {
-#             "actions": [
-#                 {
-#                     "type": "button",
-#                     "text": "Choose Personality",
-#                     "msg": "choose_personality",
-#                     "msg_in_chat_window": True,
-#                     "msg_processing_type": "sendMessage"
-#                 }
-#             ]
-#         }
-#     ]
-#     return response_payload
+def add_personality_button(response_payload):
+    # Replace any attachments with just the Personality button
+    response_payload["attachments"] = [
+        {
+            "actions": [
+                {
+                    "type": "button",
+                    "text": "Choose Personality",
+                    "msg": "choose_personality",
+                    "msg_in_chat_window": True,
+                    "msg_processing_type": "sendMessage"
+                }
+            ]
+        }
+    ]
+    return response_payload
 
   
 # def send_typing_indicator(room_id):
@@ -468,13 +468,13 @@ def query():
         menu_response["session_id"] = session_id
         return jsonify(menu_response)
     
-    # # if the user selects a personality, 
-    # if message == "set_personality":
-    #     selected_personality = data.get("selected_option", "default")
-    #     conversation_history[session_id]["personality"] = selected_personality
-    #     confirmation = f"Personality set to: {selected_personality.capitalize()}. You may now continue your conversation."
-    #     payload = {"text": confirmation, "session_id": session_id}
-    #     return jsonify(add_menu_button(payload))
+    # if the user selects a personality, 
+    if message == "set_personality":
+        selected_personality = data.get("selected_option", "default")
+        conversation_history[session_id]["personality"] = selected_personality
+        confirmation = f"Personality set to: {selected_personality.capitalize()}. You may now continue your conversation."
+        payload = {"text": confirmation, "session_id": session_id}
+        return jsonify(add_menu_button(payload))
 
     
     # Otherwise, process the query.
