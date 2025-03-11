@@ -361,26 +361,14 @@ def build_greeting_response(response_text, session_id):
         "session_id": session_id,
         "attachments": [
             {
-                "title": "Choose Chatbot Personality",
                 "actions": [
                     {
-                        "type": "select",
-                        "text": "Select Personality",
-                        "options": [
-                            {"text": "Default", "value": "default"},
-                            {"text": "Empathetic", "value": "empathetic"},
-                            {"text": "Straightforward", "value": "straightforward"},
-                            {"text": "Encouraging", "value": "encouraging"},
-                            {"text": "Detailed", "value": "detailed"}
-                        ],
-                        "msg": "set_personality",
+                        "type": "button",
+                        "text": "Choose Personality",
+                        "msg": "choose_personality",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
-                    }
-                ]
-            },
-            {
-                "actions": [
+                    },
                     {
                         "type": "button",
                         "text": "Menu",
@@ -393,6 +381,22 @@ def build_greeting_response(response_text, session_id):
         ]
     }
 
+def add_personality_button(response_payload):
+    # Replace any attachments with just the Personality button
+    response_payload["attachments"] = [
+        {
+            "actions": [
+                {
+                    "type": "button",
+                    "text": "Choose Personality",
+                    "msg": "choose_personality",
+                    "msg_in_chat_window": True,
+                    "msg_processing_type": "sendMessage"
+                }
+            ]
+        }
+    ]
+    return response_payload
 
   
 def send_typing_indicator(room_id):
