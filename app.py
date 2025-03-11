@@ -355,18 +355,13 @@ def add_menu_button(response_payload):
     ]
     return response_payload
 
-
 def build_greeting_response(response_text, session_id):
-    """
-    Constructs an interactive payload that includes both the personality dropdown and the menu button.
-    """
     return {
         "text": response_text,
         "session_id": session_id,
         "attachments": [
             {
                 "title": "Choose Chatbot Personality",
-                "text": "Select a chatbot personality:",
                 "actions": [
                     {
                         "type": "select",
@@ -398,6 +393,7 @@ def build_greeting_response(response_text, session_id):
         ]
     }
 
+
   
 def send_typing_indicator(room_id):
     headers = {
@@ -405,7 +401,7 @@ def send_typing_indicator(room_id):
         "X-User-Id": BOT_USER_ID,
         "Content-type": "application/json",
     }
-    payload = {"rid": room_id}
+    payload = {"channel_id": room_id}
     url = f"{ROCKET_CHAT_URL}/api/v1/chat.sendTyping"
     try:
         response = requests.post(url, json=payload, headers=headers)
