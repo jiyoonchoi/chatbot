@@ -351,6 +351,21 @@ def add_menu_button(response_payload):
     ]
     return response_payload
 
+def send_typing_indicator(room_id):
+    headers = {
+        "X-Auth-Token": BOT_AUTH_TOKEN,
+        "X-User-Id": BOT_USER_ID,
+        "Content-type": "application/json",
+    }
+    payload = {"roomId": room_id}
+    url = f"{ROCKET_CHAT_URL}/api/v1/chat.sendTyping"
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        print(f"DEBUG: Typing indicator response: {response.json()}")
+    except Exception as e:
+        print(f"DEBUG: Error sending typing indicator: {e}")
+
+
 @app.route('/query', methods=['POST'])
 def query():
     data = request.get_json() or request.form
@@ -358,12 +373,17 @@ def query():
     
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
+    room_id = data.get("room_id")
     
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
     
     print(f"Message from {user}: {message}")
     session_id = get_session_id(data)
+    
+    if room_id:
+        print(f"\nDEBUG: loading indicator shown\n")
+        send_typing_indicator(room_id)
     
     # Initialize conversation if not present.
     if session_id not in conversation_history:
