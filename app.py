@@ -373,7 +373,12 @@ def query():
     
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
+    
     room_id = data.get("room_id")
+    
+    if data.get("text") == "debug_data":
+        # This sends the entire request payload back to the chat.
+        return jsonify({"text": f"DEBUG: Received data: {data}"})
     
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
