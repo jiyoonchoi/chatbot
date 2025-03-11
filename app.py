@@ -398,6 +398,21 @@ def build_greeting_response(response_text, session_id):
         ]
     }
 
+  
+def send_typing_indicator(room_id):
+    headers = {
+        "X-Auth-Token": BOT_AUTH_TOKEN,
+        "X-User-Id": BOT_USER_ID,
+        "Content-type": "application/json",
+    }
+    payload = {"rid": room_id}
+    url = f"{ROCKET_CHAT_URL}/api/v1/chat.sendTyping"
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        print(f"DEBUG: Typing indicator response: {response.json()}")
+    except Exception as e:
+        print(f"DEBUG: Error sending typing indicator: {e}")
+
 
 @app.route('/query', methods=['POST'])
 def query():
@@ -407,11 +422,21 @@ def query():
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
     
+    room_id = data.get("room_id")
+    
+    if data.get("text") == "debug_data":
+        # This sends the entire request payload back to the chat.
+        return jsonify({"text": f"DEBUG: Received data: {data}"})
+    
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
     
     print(f"Message from {user}: {message}")
     session_id = get_session_id(data)
+    
+    if room_id:
+        print(f"\nDEBUG: loading indicator shown\n")
+        send_typing_indicator(room_id)
     
     # Initialize conversation if not present.
     if session_id not in conversation_history:
