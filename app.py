@@ -492,7 +492,6 @@ def query():
         intro_summary = generate_intro_summary(session_id)
         greeting_msg = (f"Hello! Here is a one sentence summary of the paper: {intro_summary}\n"
                         "Please ask a question about the research paper, or use the buttons below for a detailed summary.\n"
-                        "You can specify your TA's personality from the personality dropdown")
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
         interactive_payload = build_interactive_response(greeting_msg, session_id)
         interactive_payload["session_id"] = session_id
