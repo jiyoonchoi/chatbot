@@ -118,7 +118,11 @@ def generate_response(prompt, session_id):
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
     response = generate(
         model='4o-mini',
-        system="You are a TA chatbot for CS-150: Generative AI for Social Impact.",
+        system= "You are a TA chatbot for CS-150: Generative AI for Social Impact."
+                # default personality
+                "As a TA, you want to encourage the students to think critically,"
+                "encouraging thinking in the right direction, and helping them"
+                "come up with followup questions",
         query=prompt,
         temperature=0.0,
         lastk=5,
@@ -351,6 +355,50 @@ def add_menu_button(response_payload):
     ]
     return response_payload
 
+
+def build_greeting_response(response_text, session_id):
+    """
+    Constructs an interactive payload that includes both the personality dropdown and the menu button.
+    """
+    return {
+        "text": response_text,
+        "session_id": session_id,
+        "attachments": [
+            {
+                "title": "Choose Chatbot Personality",
+                "text": "Select a chatbot personality:",
+                "actions": [
+                    {
+                        "type": "select",
+                        "text": "Select Personality",
+                        "options": [
+                            {"text": "Default", "value": "default"},
+                            {"text": "Empathetic", "value": "empathetic"},
+                            {"text": "Straightforward", "value": "straightforward"},
+                            {"text": "Encouraging", "value": "encouraging"},
+                            {"text": "Detailed", "value": "detailed"}
+                        ],
+                        "msg": "set_personality",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            },
+            {
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Menu",
+                        "msg": "menu",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            }
+        ]
+    }
+
+  
 def send_typing_indicator(room_id):
     headers = {
         "X-Auth-Token": BOT_AUTH_TOKEN,
@@ -420,6 +468,15 @@ def query():
         menu_response["session_id"] = session_id
         return jsonify(menu_response)
     
+    # if the user selects a personality, 
+    if message == "set_personality":
+        selected_personality = data.get("selected_option", "default")
+        conversation_history[session_id]["personality"] = selected_personality
+        confirmation = f"Personality set to: {selected_personality.capitalize()}. You may now continue your conversation."
+        payload = {"text": confirmation, "session_id": session_id}
+        return jsonify(add_menu_button(payload))
+
+    
     # Otherwise, process the query.
     conversation_history[session_id]["messages"].append(("user", message))
     classification = classify_query(message)
@@ -434,11 +491,16 @@ def query():
         # Generate the one-sentence summary for a greeting.
         intro_summary = generate_intro_summary(session_id)
         greeting_msg = (f"Hello! Here is a one sentence summary of the paper: {intro_summary}\n"
-                        "Please ask a question about the research paper, or use the buttons below for a detailed summary.")
+                        "Please ask a question about the research paper, or use the buttons below for a detailed summary.\n"
+                        "You can specify your TA's personality from the personality dropdown")
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
-        interactive_payload = build_interactive_response(greeting_msg, session_id)
-        interactive_payload["session_id"] = session_id
-        return jsonify(add_menu_button(interactive_payload))
+        # interactive_payload = build_interactive_response(greeting_msg, session_id)
+        # interactive_payload["session_id"] = session_id
+        # return jsonify(add_menu_button(interactive_payload))
+        interactive_payload = build_greeting_response(greeting_msg, session_id)
+        return jsonify(interactive_payload)
+        
+
     
     return jsonify(add_menu_button({"text": "Sorry, I didn't understand that.", "session_id": session_id}))
 
