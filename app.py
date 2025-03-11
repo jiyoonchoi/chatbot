@@ -357,7 +357,7 @@ def send_typing_indicator(room_id):
         "X-User-Id": BOT_USER_ID,
         "Content-type": "application/json",
     }
-    payload = {"roomId": room_id}
+    payload = {"rid": room_id}
     url = f"{ROCKET_CHAT_URL}/api/v1/chat.sendTyping"
     try:
         response = requests.post(url, json=payload, headers=headers)
