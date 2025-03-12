@@ -620,24 +620,20 @@ def query():
         send_direct_message_to_TA(final_question, user, ta_username)
 
         confirmation = f"Your question has been sent to TA {ta_name}!"
+       
         conversation_history[session_id]["awaiting_ta_question"] = False 
         conversation_history[session_id].pop("student_question", None)
         conversation_history[session_id].pop("suggested_question", None)
         conversation_history[session_id].pop("final_question", None)
+        
+        return jsonify(add_menu_button({"text": confirmation, "session_id": session_id}))
 
-
-        return jsonify({
-            "text": confirmation,
-            "session_id": session_id
-        })
 
     # If the student cancels sending
     if message == "cancel_send":
         conversation_history[session_id]["awaiting_ta_question"] = False
-        return jsonify({
-            "text": "Your question was not sent. Let me know if you need anything else.",
-            "session_id": session_id
-        })
+        return jsonify(add_menu_button({"text": "Your question was not sent. Let me know if you need anything else.", "session_id": session_id}))
+    
 
         # send_direct_message_to_TA(message, user, ta_username)
         # confirmation = f"Your TA question has been forwarded to TA {ta_name}. They will get back to you soon."
