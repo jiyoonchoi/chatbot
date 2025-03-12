@@ -537,7 +537,7 @@ def query():
         return jsonify(menu_response)
     
     # if the user selects a personality, 
-    if message == "set_personality":
+    if message == "choose_personality":
         selected_personality = data.get("selected_option", "default")
         conversation_history[session_id]["personality"] = selected_personality
         confirmation = f"Personality set to: {selected_personality.capitalize()}. You may now continue your conversation."
