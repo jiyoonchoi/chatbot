@@ -538,12 +538,15 @@ def query():
     
     # if the user selects a personality, 
     if message == "choose_personality":
-        selected_personality = data.get("selected_option", "default")
-        conversation_history[session_id]["personality"] = selected_personality
-        confirmation = f"Personality set to: {selected_personality.capitalize()}. You may now continue your conversation."
+        return jsonify(build_personality_response())
+    
+    # Handle messages from personality option buttons.
+    if message.startswith("personality_"):
+        personality_value = message.replace("personality_", "")
+        conversation_history[session_id]["personality"] = personality_value
+        confirmation = f"Personality set to: {personality_value.capitalize()}. You may now continue your conversation."
         payload = {"text": confirmation, "session_id": session_id}
         return jsonify(add_menu_button(payload))
-
     
     # Otherwise, process the query.
     conversation_history[session_id]["messages"].append(("user", message))
