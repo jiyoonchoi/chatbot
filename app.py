@@ -46,12 +46,8 @@ MSG_ENDPOINT = os.getenv("msgEndPoint")
 
 def get_session_id(data):
     user = data.get("user_name", "unknown_user").strip().lower()
-    try:
-        pdf_version = os.path.getmtime(PDF_PATH)
-    except Exception as e:
-        print(f"DEBUG: Could not get PDF modification time: {e}")
-        pdf_version = "0"
-    return f"session_{user}_{int(pdf_version)}"
+    return f"session_{user}"
+
 
 def upload_pdf_if_needed(pdf_path, session_id):
     print(f"DEBUG: upload_pdf_if_needed() called for session {session_id}")  
@@ -117,13 +113,14 @@ def wait_for_pdf_readiness(session_id, max_attempts=10, delay=5):
 
 def generate_response(prompt, session_id):
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
+    system_prompt = (
+        "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+        "As a TA, you want to encourage students to think critically and learn more by providing insightful answers. "
+        "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
+    )
     response = generate(
         model='4o-mini',
-        system= "You are a TA chatbot for CS-150: Generative AI for Social Impact."
-                # default personality
-                "As a TA, you want to encourage the students to think critically,"
-                "encouraging thinking in the right direction, and helping them"
-                "come up with followup questions",
+        system=system_prompt,
         query=prompt,
         temperature=0.0,
         lastk=5,
