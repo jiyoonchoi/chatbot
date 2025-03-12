@@ -18,7 +18,8 @@ print("DEBUG: PDF path set to:", PDF_PATH)
 app = Flask(__name__)
 
 # Global caches (session-specific)
-summary_cache = {}
+summary_abstract_cache = {}
+summary_full_cache = {}
 processed_pdf = {}
 pdf_ready = {}
 conversation_history = {}
@@ -176,28 +177,36 @@ def generate_intro_summary(session_id):
     return generate_response(prompt, session_id)
 
 def summarizing_agent(action_type, session_id):
-    if session_id not in summary_cache:
-        summary_cache[session_id] = {}
-
-    if summary_cache[session_id].get(action_type):
-        return summary_cache[session_id][action_type]
-
-    if not upload_pdf_if_needed(PDF_PATH, session_id):
-        return "Could not upload PDF."
-
-    if not wait_for_pdf_readiness(session_id):
-        return "PDF processing is not complete. Please try again shortly."
-
     if action_type == "summarize_abstract":
+        if session_id in summary_abstract_cache:
+            return summary_abstract_cache[session_id]
+        
+        if not upload_pdf_if_needed(PDF_PATH, session_id):
+            return "Could not upload PDF."
+        if not wait_for_pdf_readiness(session_id):
+            return "PDF processing is not complete. Please try again shortly."
+        
         prompt = (
             "Based solely on the research paper that was uploaded in this session, "
             "please provide a detailed summary focusing on the abstract. "
             "Include the main objectives and key points of the abstract."
         )
+        summary = generate_response(prompt, session_id)
+        summary_abstract_cache[session_id] = summary
+        return summary
+
     elif action_type == "summarize_full":
+        if session_id in summary_full_cache:
+            return summary_full_cache[session_id]
+        
+        if not upload_pdf_if_needed(PDF_PATH, session_id):
+            return "Could not upload PDF."
+        if not wait_for_pdf_readiness(session_id):
+            return "PDF processing is not complete. Please try again shortly."
+        
         prompt = (
             "Based solely on the research paper that was uploaded in this session, please provide a comprehensive and well-organized summary of the entire paper. "
-            "Your summary should include the following sections:\n\n"
+            "Your summary should include the following sections with clear bullet points:\n\n"
             "1. **Title & Publication Details:** List the paper's title, authors, publication venue, and year.\n\n"
             "2. **Abstract & Problem Statement:** Summarize the abstract, highlighting the key challenges and the motivation behind the study.\n\n"
             "3. **Methodology:** Describe the research methods, experimental setup, and techniques used in the paper.\n\n"
@@ -205,12 +214,21 @@ def summarizing_agent(action_type, session_id):
             "5. **Conclusions & Future Work:** Summarize the conclusions, implications of the study, and suggestions for future research.\n\n"
             "Please present your summary using clear headings and bullet points or numbered lists where appropriate."
         )
+        summary = generate_response(prompt, session_id)
+        summary_full_cache[session_id] = summary
+        return summary
     else:
         return "Invalid summarization action."
 
-    summary = generate_response(prompt, session_id)
-    summary_cache[session_id][action_type] = summary
-    return summary
+    # if not upload_pdf_if_needed(PDF_PATH, session_id):
+    #     return "Could not upload PDF."
+
+    # if not wait_for_pdf_readiness(session_id):
+    #     return "PDF processing is not complete. Please try again shortly."
+
+    # summary = generate_response(prompt, session_id)
+    # summary_cache[session_id][action_type] = summary
+    # return summary
 
 def answer_question(question, session_id):
     if not upload_pdf_if_needed(PDF_PATH, session_id):
