@@ -509,24 +509,39 @@ def build_TA_button():
 
 def generate_suggested_question(student_question):
     prompt = (
-        f"Based on the following student question, generate a clearer and more refined version:\n\n"
+        f"Based on the following student question, generate a clearer and more concise version that does not reference any PDF content:\n\n"
         f"Student question: \"{student_question}\"\n\n"
         "Suggested improved question:"
     )
 
-    suggested_question = generate_response(prompt, "suggestion_session")
-
-    suggested_question_full = suggested_question.strip()
-
-    # Extract only the first sentence for sending to the TA
-    suggested_question_clean = re.search(r'"(.*?)"', suggested_question_full)
-
-    if suggested_question_clean:
-        suggested_question_clean = suggested_question_clean.group(1)  # Extracted text inside the first quotation marks
+    response = generate(
+         model='4o-mini',
+         system=(
+             "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+             "Rephrase the student's question to be clearer and more concise without referring to any external context."
+         ),
+         query=prompt,
+         temperature=0.0,
+         lastk=5,
+         session_id="suggestion_session",
+         rag_usage=False,   # DISABLED
+         rag_threshold=0.3,
+         rag_k=0
+    )
+    if isinstance(response, dict):
+         result = response.get('response', '').strip()
     else:
-        suggested_question_clean = suggested_question_full  # Fallback if no quotes are found
+         result = response.strip()
 
-    print(f"DEBUG: Suggested question: {suggested_question}")
+    suggested_question_full = result
+    # Extract the first quoted sentence if available, or fallback to the full result.
+    suggested_question_clean = re.search(r'"(.*?)"', suggested_question_full)
+    if suggested_question_clean:
+         suggested_question_clean = suggested_question_clean.group(1)
+    else:
+         suggested_question_clean = suggested_question_full
+
+    print(f"DEBUG: Suggested question: {suggested_question_full}")
     print("END OF SUGGESTED QUESTION")
     return suggested_question_full, suggested_question_clean
 
@@ -707,7 +722,7 @@ def query():
 
     # If the student cancels sending
     if message == "cancel_send":
-        conversation_history[session_id].pop("awaiting_ta_question", None)
+        conversation_history[session_id]["awaiting_ta_question"] = False
         conversation_history[session_id].pop("student_question", None)
         conversation_history[session_id].pop("suggested_question", None)
         conversation_history[session_id].pop("final_question", None)
@@ -715,7 +730,7 @@ def query():
             "text": "Your question was not sent. Let me know if you need anything else.",
             "session_id": session_id
         }))
-
+    
         # send_direct_message_to_TA(message, user, ta_username)
         # confirmation = f"Your TA question has been forwarded to TA {ta_name}. They will get back to you soon."
         # conversation_history[session_id]["awaiting_ta_question"] = False 
