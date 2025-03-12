@@ -63,8 +63,8 @@ def upload_pdf_if_needed(pdf_path, session_id):
     print("DEBUG: PDF file found, proceeding with upload...")
 
     if processed_pdf.get(session_id):
-        print(f"DEBUG: PDF already processed for session {session_id}, but forcing reprocessing.")
-        processed_pdf[session_id] = False  # Reset processing flag
+        print(f"DEBUG: PDF already processed for session {session_id}.")
+        return True
 
     print("DEBUG: Uploading PDF now...")
 
@@ -493,16 +493,15 @@ def query():
     
     # Clear history command: clear conversation and caches.
     if message == "clear_history":
-        if session_id in conversation_history:
-            del conversation_history[session_id]
-        if session_id in summary_cache:
-            del summary_cache[session_id]
-        if session_id in processed_pdf:
-            del processed_pdf[session_id]
-        if session_id in pdf_ready:
-            del pdf_ready[session_id]
-        return jsonify(add_menu_button({"text": "Your conversation history and caches have been cleared.", "session_id": session_id}))
-    
+        conversation_history.pop(session_id, None)
+        summary_cache.pop(session_id, None)
+        processed_pdf.pop(session_id, None)
+        pdf_ready.pop(session_id, None)
+        return jsonify(add_menu_button({
+            "text": "Your conversation history and caches have been cleared.",
+            "session_id": session_id
+        }))
+
     # If awaiting a TA question, forward it.
     if (conversation_history[session_id].get("awaiting_ta_question") 
     and message not in ["use_suggested_question", "keep_own", "confirm_send", "cancel_send"]):
@@ -613,14 +612,18 @@ def query():
 
     # If the student confirms sending the question
     if message == "confirm_send":
-        ta_name = conversation_history[session_id]["awaiting_ta_question"]
+        ta_name = conversation_history[session_id].get("awaiting_ta_question")
+        if not ta_name:
+            return jsonify({"text": "No TA selected.", "session_id": session_id})
+        
         ta_username = "aya.ismail" if ta_name == "Aya" else "jiyoon.choi"
-        final_question = conversation_history[session_id]["final_question"]
-
+        final_question = conversation_history[session_id].get("final_question")
+        if not final_question:
+            return jsonify({"text": "No final question available. Please provide a question for your TA.", "session_id": session_id})
+        
         send_direct_message_to_TA(final_question, user, ta_username)
-
+        
         confirmation = f"Your question has been sent to TA {ta_name}!"
-       
         conversation_history[session_id]["awaiting_ta_question"] = False 
         conversation_history[session_id].pop("student_question", None)
         conversation_history[session_id].pop("suggested_question", None)
@@ -631,9 +634,14 @@ def query():
 
     # If the student cancels sending
     if message == "cancel_send":
-        conversation_history[session_id]["awaiting_ta_question"] = False
-        return jsonify(add_menu_button({"text": "Your question was not sent. Let me know if you need anything else.", "session_id": session_id}))
-    
+        conversation_history[session_id].pop("awaiting_ta_question", None)
+        conversation_history[session_id].pop("student_question", None)
+        conversation_history[session_id].pop("suggested_question", None)
+        conversation_history[session_id].pop("final_question", None)
+        return jsonify(add_menu_button({
+            "text": "Your question was not sent. Let me know if you need anything else.",
+            "session_id": session_id
+        }))
 
         # send_direct_message_to_TA(message, user, ta_username)
         # confirmation = f"Your TA question has been forwarded to TA {ta_name}. They will get back to you soon."
