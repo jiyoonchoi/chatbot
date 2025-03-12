@@ -112,12 +112,38 @@ def wait_for_pdf_readiness(session_id, max_attempts=10, delay=5):
     
 
 def generate_response(prompt, session_id):
+    personality = conversation_history.get(session_id, {}).get("personality", "default")
+    
+    # Choose the system prompt based on the personality.
+    if personality == "critical":
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you challenge students to think deeply and question assumptions. "
+            "Provide thorough analysis and constructive criticism in your responses."
+            "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
+        )
+    elif personality == "empathetic":
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you are caring and supportive, offering kind explanations and understanding of complex topics."
+            "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
+        )
+    elif personality == "straightforward":
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you provide clear and concise answers without unnecessary details."
+            "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
+        )
+    else:
+        # Default personality
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you want to encourage students to think critically and learn more by providing insightful answers. "
+            "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
+        )
+        
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
-    system_prompt = (
-        "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-        "As a TA, you want to encourage students to think critically and learn more by providing insightful answers. "
-        "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
-    )
+
     response = generate(
         model='4o-mini',
         system=system_prompt,
@@ -351,48 +377,93 @@ def add_menu_button(response_payload):
     ]
     return response_payload
 
-# def build_greeting_response(response_text, session_id):
-#     return {
-#         "text": response_text,
-#         "session_id": session_id,
-#         "attachments": [
-#             {
-#                 "actions": [
-#                     {
-#                         "type": "button",
-#                         "text": "Choose Personality",
-#                         "msg": "choose_personality",
-#                         "msg_in_chat_window": True,
-#                         "msg_processing_type": "sendMessage"
-#                     },
-#                     {
-#                         "type": "button",
-#                         "text": "Menu",
-#                         "msg": "menu",
-#                         "msg_in_chat_window": True,
-#                         "msg_processing_type": "sendMessage"
-#                     }
-#                 ]
-#             }
-#         ]
-#     }
+def build_greeting_response(response_text, session_id):
+    return {
+        "text": response_text,
+        "session_id": session_id,
+        "attachments": [
+            {
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Choose Personality",
+                        "msg": "choose_personality",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Menu",
+                        "msg": "menu",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            }
+        ]
+    }
 
-# def add_personality_button(response_payload):
-#     # Replace any attachments with just the Personality button
-#     response_payload["attachments"] = [
-#         {
-#             "actions": [
-#                 {
-#                     "type": "button",
-#                     "text": "Choose Personality",
-#                     "msg": "choose_personality",
-#                     "msg_in_chat_window": True,
-#                     "msg_processing_type": "sendMessage"
-#                 }
-#             ]
-#         }
-#     ]
-#     return response_payload
+def build_personality_response():
+    return {
+        "text": "Select a personality:",
+        "attachments": [
+            {
+                "title": "Select an option:",
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Default",
+                        "msg": "personality_default",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Straightforward",
+                        "msg": "personality_straightforward",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Critical",
+                        "msg": "personality_critical",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Empathetic",
+                        "msg": "personality_empathetic",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Other",
+                        "msg": "personality_other",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                    ]}]
+    }
+
+def add_personality_button(response_payload):
+    # Replace any attachments with just the Personality button
+    response_payload["attachments"] = [
+        {
+            "actions": [
+                {
+                    "type": "button",
+                    "text": "Choose Personality",
+                    "msg": "choose_personality",
+                    "msg_in_chat_window": True,
+                    "msg_processing_type": "sendMessage"
+                }
+            ]
+        }
+    ]
+    return response_payload
 
   
 # def send_typing_indicator(room_id):
@@ -677,14 +748,17 @@ def query():
         })
 
 
-    # # if the user selects a personality, 
-    # if message == "set_personality":
-    #     selected_personality = data.get("selected_option", "default")
-    #     conversation_history[session_id]["personality"] = selected_personality
-    #     confirmation = f"Personality set to: {selected_personality.capitalize()}. You may now continue your conversation."
-    #     payload = {"text": confirmation, "session_id": session_id}
-    #     return jsonify(add_menu_button(payload))
-
+    # if the user selects a personality, 
+    if message == "choose_personality":
+        return jsonify(build_personality_response())
+    
+    # Handle messages from personality option buttons.
+    if message.startswith("personality_"):
+        personality_value = message.replace("personality_", "")
+        conversation_history[session_id]["personality"] = personality_value
+        confirmation = f"Personality set to: {personality_value.capitalize()}. You may now continue your conversation."
+        payload = {"text": confirmation, "session_id": session_id}
+        return jsonify(add_menu_button(payload))
     
     # Otherwise, process the query.
     conversation_history[session_id]["messages"].append(("user", message))
@@ -702,11 +776,11 @@ def query():
         greeting_msg = (f"Hello! Here is a one sentence summary of the paper: {intro_summary}\n"
                         "Please ask a question about the research paper, or use the buttons below for a detailed summary.\n")
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
-        interactive_payload = build_interactive_response(greeting_msg, session_id)
-        interactive_payload["session_id"] = session_id
-        return jsonify(add_menu_button(interactive_payload))
-        # interactive_payload = build_greeting_response(greeting_msg, session_id)
-        # return jsonify(interactive_payload)
+        # interactive_payload = build_interactive_response(greeting_msg, session_id)
+        # interactive_payload["session_id"] = session_id
+        # return jsonify(add_menu_button(interactive_payload))
+        interactive_payload = build_greeting_response(greeting_msg, session_id)
+        return jsonify(interactive_payload)
         
 
     
