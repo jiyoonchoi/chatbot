@@ -600,7 +600,8 @@ def query():
     # Clear history command: clear conversation and caches.
     if message == "clear_history":
         conversation_history.pop(session_id, None)
-        summary_cache.pop(session_id, None)
+        summary_abstract_cache.pop(session_id, None)
+        summary_full_cache.pop(session_id, None)
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
         return jsonify(add_menu_button({
