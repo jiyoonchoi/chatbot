@@ -115,14 +115,37 @@ def wait_for_pdf_readiness(session_id, max_attempts=10, delay=5):
     
 
 def generate_response(prompt, session_id):
+    personality = conversation_history.get(session_id, {}).get("personality", "default")
+    
+    # Choose the system prompt based on the personality.
+    if personality == "critical":
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you challenge students to think deeply and question assumptions. "
+            "Provide thorough analysis and constructive criticism in your responses."
+        )
+    elif personality == "empathetic":
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you are caring and supportive, offering kind explanations and understanding of complex topics."
+        )
+    elif personality == "straightforward":
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you provide clear and concise answers without unnecessary details."
+        )
+    else:
+        # Default personality
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you want to encourage the students to think critically, "
+            "guiding them in the right direction and helping them come up with followup questions."
+        )
+        
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
     response = generate(
         model='4o-mini',
-        system= "You are a TA chatbot for CS-150: Generative AI for Social Impact."
-                # default personality
-                "As a TA, you want to encourage the students to think critically,"
-                "encouraging thinking in the right direction, and helping them"
-                "come up with followup questions",
+        system=system_prompt,
         query=prompt,
         temperature=0.0,
         lastk=5,
@@ -381,6 +404,51 @@ def build_greeting_response(response_text, session_id):
         ]
     }
 
+def build_personality_response():
+    return {
+        "text": "Select a personality:",
+        "attachments": [
+            {
+                "title": "Select an option:",
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Default",
+                        "msg": "personality_default",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Straightforward",
+                        "msg": "personality_straightforward",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Critical",
+                        "msg": "personality_critical",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "empathetic",
+                        "msg": "personality_empathetic",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Other",
+                        "msg": "personality_other",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                    ]}]
+    }
+
 def add_personality_button(response_payload):
     # Replace any attachments with just the Personality button
     response_payload["attachments"] = [
@@ -494,11 +562,11 @@ def query():
                         "Please ask a question about the research paper, or use the buttons below for a detailed summary.\n"
                         "You can specify your TA's personality from the personality dropdown")
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
-        interactive_payload = build_interactive_response(greeting_msg, session_id)
-        interactive_payload["session_id"] = session_id
-        return jsonify(add_menu_button(interactive_payload))
-        # interactive_payload = build_greeting_response(greeting_msg, session_id)
-        # return jsonify(interactive_payload)
+        # interactive_payload = build_interactive_response(greeting_msg, session_id)
+        # interactive_payload["session_id"] = session_id
+        # return jsonify(add_menu_button(interactive_payload))
+        interactive_payload = build_greeting_response(greeting_msg, session_id)
+        return jsonify(interactive_payload)
         
 
     
