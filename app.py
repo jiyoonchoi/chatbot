@@ -2,6 +2,7 @@ import os
 import uuid
 import time
 import requests
+import re
 from flask import Flask, request, jsonify
 from llmproxy import generate, pdf_upload
 from dotenv import load_dotenv
@@ -197,8 +198,8 @@ def answer_question(question, session_id):
     )
     return generate_response(prompt, session_id)
 
-def send_direct_message_to_TA(question, session_id):
-    ta_username = TA_USERNAME  
+def send_direct_message_to_TA(question, session_id, ta_username):
+     
     msg_url = MSG_ENDPOINT
     headers = {
         "Content-Type": "application/json",
@@ -206,7 +207,7 @@ def send_direct_message_to_TA(question, session_id):
         "X-User-Id": BOT_USER_ID,
     }
     
-    student = session_id[len("session_"):]
+    student = session_id
     message_text = f"Student '{student}' asks: {question}"
     
     payload = {
@@ -298,13 +299,6 @@ def build_menu_response():
                         "type": "button",
                         "text": "Summarize Full Paper",
                         "msg": "summarize_full",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    },
-                    {
-                        "type": "button",
-                        "text": "Ask a TA",
-                        "msg": "ask_TA",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
@@ -413,9 +407,64 @@ def add_menu_button(response_payload):
 #     except Exception as e:
 #         print(f"DEBUG: Error sending typing indicator: {e}")
 
+def build_TA_button():
+    
+    return {
+        "text": "Select a TA to ask your question:",
+        "attachments": [
+            {
+                "title": "Choose a TA",
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Ask TA Aya",
+                        "msg": "ask_TA_Aya",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Ask TA Jiyoon",
+                        "msg": "ask_TA_Jiyoon",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            }
+        ]
+    }    
+
+def generate_suggested_question(student_question):
+    prompt = (
+        f"Based on the following student question, generate a clearer and more refined version:\n\n"
+        f"Student question: \"{student_question}\"\n\n"
+        "Suggested improved question:"
+    )
+
+    suggested_question = generate_response(prompt, "suggestion_session")
+
+    suggested_question_full = suggested_question.strip()
+
+    # Extract only the first sentence for sending to the TA
+    suggested_question_clean = re.search(r'"(.*?)"', suggested_question_full)
+
+    if suggested_question_clean:
+        suggested_question_clean = suggested_question_clean.group(1)  # Extracted text inside the first quotation marks
+    else:
+        suggested_question_clean = suggested_question_full  # Fallback if no quotes are found
+
+    print(f"DEBUG: Suggested question: {suggested_question}")
+    print("END OF SUGGESTED QUESTION")
+    return suggested_question_full, suggested_question_clean
 
 @app.route('/query', methods=['POST'])
+
 def query():
+
+    # Debugging: Print request headers and raw data
+    print("DEBUG Headers:", request.headers)
+    print("DEBUG Raw Data:", request.data)  # This helps debug if JSON is malformed
+
     data = request.get_json() or request.form
     print(f"DEBUG: Received request data: {data}")
     
@@ -455,12 +504,142 @@ def query():
         return jsonify(add_menu_button({"text": "Your conversation history and caches have been cleared.", "session_id": session_id}))
     
     # If awaiting a TA question, forward it.
-    if conversation_history[session_id].get("awaiting_ta_question", False):
-        ta_question = message
-        send_direct_message_to_TA(ta_question, user)
-        confirmation = f"Your TA question has been forwarded to {TA_USERNAME}. They will get back to you soon."
-        payload = {"text": confirmation, "session_id": session_id}
-        return jsonify(add_menu_button(payload))
+    if (conversation_history[session_id].get("awaiting_ta_question") 
+    and message not in ["use_suggested_question", "keep_own", "confirm_send", "cancel_send"]):
+        
+        ta_name = conversation_history[session_id]["awaiting_ta_question"]
+        ta_username = "aya.ismail" if ta_name == "Aya" else "jiyoon.choi"
+        
+        suggested_question_full, suggested_question_clean = generate_suggested_question(message)
+        print(f"DEBUG: Suggested question full: {suggested_question_full}")
+        print("END OF SUGGESTED QUESTION")
+        print(f"DEBUG: Suggested question clean: {suggested_question_clean}")
+        print("END OF SUGGESTED QUESTION")
+        conversation_history[session_id]["student_question"] = message
+        # conversation_history[session_id]["suggested_question"] = suggested_question
+        conversation_history[session_id]["suggested_question"] = suggested_question_full  # Full version for student
+        conversation_history[session_id]["final_question"] = suggested_question_clean  # Clean version for TA
+
+        return jsonify({
+        "text": f"Here is a suggested question based on what you wrote:\n\n"
+                f"**{suggested_question_full}**\n\n"
+                "Would you like to send this suggested question or keep your own?",
+        "attachments": [
+            {
+                "title": "Select an option:",
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Use Suggested Question",
+                        "msg": "use_suggested_question",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Keep My Own",
+                        "msg": "keep_own",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            }
+        ],
+        "session_id": session_id
+    })
+
+    # If the student chooses to use the suggested question
+    if message == "use_suggested_question":
+        # final_question = conversation_history[session_id]["suggested_question"]
+        final_question = conversation_history[session_id].get("final_question", "No question available.")
+        # conversation_history[session_id]["final_question"] = final_question
+
+        return jsonify({
+            "text": f"You selected the suggested question:\n\n**{final_question}**\n\n"
+                    "Do you want to send this to TA?",
+            "attachments": [
+                {
+                    "title": "Confirm sending:",
+                    "actions": [
+                        {
+                            "type": "button",
+                            "text": "Confirm Send",
+                            "msg": "confirm_send",
+                            "msg_in_chat_window": True,
+                            "msg_processing_type": "sendMessage"
+                        },
+                        {
+                            "type": "button",
+                            "text": "Cancel",
+                            "msg": "cancel_send",
+                            "msg_in_chat_window": True,
+                            "msg_processing_type": "sendMessage"
+                        }
+                    ]
+                }
+            ],
+            "session_id": session_id
+        })
+
+# If the student wants to write their own question again
+    if message == "keep_own":
+        final_question = conversation_history[session_id].get("student_question", "No question available.")
+        conversation_history[session_id]["final_question"] = final_question
+        return jsonify ({"text": f"Do you want to send your question :\n\n**{final_question}**\n\n"
+                "to the TA?",
+        "attachments": [
+            {
+                "title": "Confirm sending:",
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Confirm Send",
+                        "msg": "confirm_send",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Cancel",
+                        "msg": "cancel_send",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                ]
+            }
+        ],
+        "session_id": session_id
+    })
+
+    # If the student confirms sending the question
+    if message == "confirm_send":
+        ta_name = conversation_history[session_id]["awaiting_ta_question"]
+        ta_username = "aya.ismail" if ta_name == "Aya" else "jiyoon.choi"
+        final_question = conversation_history[session_id]["final_question"]
+
+        send_direct_message_to_TA(final_question, user, ta_username)
+
+        confirmation = f"Your question has been sent to TA {ta_name}!"
+       
+        conversation_history[session_id]["awaiting_ta_question"] = False 
+        conversation_history[session_id].pop("student_question", None)
+        conversation_history[session_id].pop("suggested_question", None)
+        conversation_history[session_id].pop("final_question", None)
+        
+        return jsonify(add_menu_button({"text": confirmation, "session_id": session_id}))
+
+
+    # If the student cancels sending
+    if message == "cancel_send":
+        conversation_history[session_id]["awaiting_ta_question"] = False
+        return jsonify(add_menu_button({"text": "Your question was not sent. Let me know if you need anything else.", "session_id": session_id}))
+    
+
+        # send_direct_message_to_TA(message, user, ta_username)
+        # confirmation = f"Your TA question has been forwarded to TA {ta_name}. They will get back to you soon."
+        # conversation_history[session_id]["awaiting_ta_question"] = False 
+        # payload = {"text": confirmation, "session_id": session_id}
+        # return jsonify(add_menu_button(payload))
     
     # If the user clicked the Menu button, return the full interactive menu.
     if message == "menu":
@@ -468,6 +647,26 @@ def query():
         menu_response["session_id"] = session_id
         return jsonify(menu_response)
     
+    if message == "ask_TA": 
+
+        conversation_history[session_id]["awaiting_ta_question"] = False
+        conversation_history[session_id].pop("student_question", None)
+        conversation_history[session_id].pop("suggested_question", None)
+        conversation_history[session_id].pop("final_question", None)
+
+        ta_button_response = build_TA_button()
+        ta_button_response["session_id"] = session_id
+        return jsonify(ta_button_response)
+        
+    if message in ["ask_TA_Aya", "ask_TA_Jiyoon"]:
+        ta_selected = "Aya" if message == "ask_TA_Aya" else "Jiyoon"
+        conversation_history[session_id]["awaiting_ta_question"] = ta_selected
+        return jsonify({
+            "text": f"Please type your question for TA {ta_selected}.",
+            "session_id": session_id
+        })
+
+
     # # if the user selects a personality, 
     # if message == "set_personality":
     #     selected_personality = data.get("selected_option", "default")
@@ -491,7 +690,7 @@ def query():
         # Generate the one-sentence summary for a greeting.
         intro_summary = generate_intro_summary(session_id)
         greeting_msg = (f"Hello! Here is a one sentence summary of the paper: {intro_summary}\n"
-                        "Please ask a question about the research paper, or use the buttons below for a detailed summary.\n"
+                        "Please ask a question about the research paper, or use the buttons below for a detailed summary.\n")
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
         interactive_payload = build_interactive_response(greeting_msg, session_id)
         interactive_payload["session_id"] = session_id
