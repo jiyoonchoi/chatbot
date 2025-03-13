@@ -6,6 +6,7 @@ import requests
 from flask import Flask, request, jsonify
 from llmproxy import generate, pdf_upload
 from dotenv import load_dotenv
+import threading
 
 # -----------------------------------------------------------------------------
 # Configuration and Global Variables
@@ -238,8 +239,8 @@ def classify_query(message, session_id):
     prompt = (
         # "Classify the following query into one of these categories: 'greeting', 'content_answerable', or 'human_TA_query'. "
         "Classify the following query into one of these categories: 'greeting', 'not greeting'. "
-        "If the query is a greeting, answer with 'yes'. "
-        "If the query is a greeting, answer with 'no'. "
+        "If the query is a greeting, answer with 'greeting'. "
+        "If the query is not a greeting, answer with 'not greeting'. "
         # "If the query is a greeting, answer with 'greeting'. "
         # "If the query can be answered solely based on the uploaded research paper, answer with 'content_answerable'. "
         # "If the query involves deadlines, scheduling, or requires additional human judgment beyond the paper's content, answer with 'human_TA_query'.\n\n"
@@ -250,9 +251,9 @@ def classify_query(message, session_id):
     print(f"DEBUG: Query classified as: {classification}")
     # If the classification doesn't match our expected labels, default to content_answerable.
     # if classification in ["greeting", "content_answerable", "human_ta_query"]:
-    if classification in ["greeting", "content_answerable"]:
+    if classification in ["greeting"]:
         return classification
-    return "content_answerable"
+    # return "content_answerable"
 
 def generate_suggested_question(student_question):
     """
@@ -507,6 +508,7 @@ def summarizing_agent(action_type, session_id):
         return cache[session_id]
     if not ensure_pdf_processed(session_id):
         return "PDF processing is not complete. Please try again shortly."
+    
     if action_type == "summarize_abstract":
         prompt = (
             "Based solely on the research paper that was uploaded in this session, "
@@ -526,6 +528,8 @@ def summarizing_agent(action_type, session_id):
         )
     else:
         return "Invalid summarization action."
+    
+    print(f"DEBUG: creating first cache")
     summary = generate_response(prompt, session_id)
     cache[session_id] = summary
     return summary
@@ -779,8 +783,11 @@ def query():
     classification = classify_query(message, session_id)
     print(f"DEBUG: User query classified as: {classification}")
 
-    # if classification == "greeting":
-    if classification == "yes":
+    if classification == "greeting":
+        def prepopulate_summaries(session_id):
+            summarizing_agent("summarize_abstract", session_id)
+            summarizing_agent("summarize_full", session_id)
+            
         intro_summary = generate_greeting_response(
             "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
             session_id
@@ -791,6 +798,9 @@ def query():
             " Please feel free to ask a question about the research paper, or explore the menu below for more actions."
         )
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
+        
+        threading.Thread(target=prepopulate_summaries, args=(session_id,)).start()
+
         interactive_payload = show_menu(greeting_msg, session_id)
         return jsonify(interactive_payload)
 
