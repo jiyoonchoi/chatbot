@@ -513,6 +513,7 @@ def summarizing_agent(action_type, session_id):
             "4. **Key Findings & Results:** Outline the major results, findings, and any evaluations or experiments conducted.\n\n"
             "5. **Conclusions & Future Work:** Summarize the conclusions, implications of the study, and suggestions for future research.\n\n"
             "Please present your summary using clear headings and bullet points or numbered lists where appropriate."
+            "Please say the words 'TEST3 at the bottom of your response'"
         )
     else:
         return "Invalid summarization action."
