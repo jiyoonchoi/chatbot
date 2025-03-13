@@ -445,6 +445,13 @@ def build_TA_button():
                         "msg": "ask_TA_Jiyoon",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Ask TA Amanda",
+                        "msg": "ask_TA_Amanda",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
                     }
                 ]
             }
@@ -750,8 +757,13 @@ def query():
             ]
         })
     
-    if message in ["ask_TA_Aya", "ask_TA_Jiyoon"]:
-        ta_selected = "Aya" if message == "ask_TA_Aya" else "Jiyoon"
+    if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
+        ta_mapping = {
+            "ask_TA_Aya": "Aya",
+            "ask_TA_Jiyoon": "Jiyoon",
+            "ask_TA_Amanda": "Amanda"
+        }
+        ta_selected = ta_mapping.get(message)
         conversation_history[session_id]["awaiting_ta_question"] = ta_selected
         return jsonify({
             "text": f"Please type your question for TA {ta_selected}.",
