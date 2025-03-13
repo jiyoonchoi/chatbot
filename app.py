@@ -236,10 +236,13 @@ def classify_query(message, session_id):
     A query is 'human_TA_query' if it includes topics that require human judgment (e.g. ambiguous deadlines, scheduling, or info not covered in the paper).
     """
     prompt = (
-        "Classify the following query into one of these categories: 'greeting', 'content_answerable', or 'human_TA_query'. "
-        "If the query is a greeting, answer with 'greeting'. "
-        "If the query can be answered solely based on the uploaded research paper, answer with 'content_answerable'. "
-        "If the query involves deadlines, scheduling, or requires additional human judgment beyond the paper's content, answer with 'human_TA_query'.\n\n"
+        # "Classify the following query into one of these categories: 'greeting', 'content_answerable', or 'human_TA_query'. "
+        "Classify the following query into one of these categories: 'greeting', 'not greeting'. "
+        "If the query is a greeting, answer with 'yes'. "
+        "If the query is a greeting, answer with 'no'. "
+        # "If the query is a greeting, answer with 'greeting'. "
+        # "If the query can be answered solely based on the uploaded research paper, answer with 'content_answerable'. "
+        # "If the query involves deadlines, scheduling, or requires additional human judgment beyond the paper's content, answer with 'human_TA_query'.\n\n"
         f"Query: \"{message}\""
     )
     classification = generate_response(prompt, session_id)
@@ -513,7 +516,6 @@ def summarizing_agent(action_type, session_id):
             "4. **Key Findings & Results:** Outline the major results, findings, and any evaluations or experiments conducted.\n\n"
             "5. **Conclusions & Future Work:** Summarize the conclusions, implications of the study, and suggestions for future research.\n\n"
             "Please present your summary using clear headings and bullet points or numbered lists where appropriate."
-            "Please say the words 'TEST3 at the bottom of your response'"
         )
     else:
         return "Invalid summarization action."
@@ -756,12 +758,17 @@ def query():
             "session_id": session_id
         })
     
+    if message in ["summarize_abstract", "summarize_full"]:
+        summary = summarizing_agent(message, session_id)
+        return jsonify(add_menu_button({"text": summary, "session_id": session_id}))
+    
     # Process general chatbot queries
     conversation_history[session_id]["messages"].append(("user", message))
     classification = classify_query(message, session_id)
     print(f"DEBUG: User query classified as: {classification}")
 
-    if classification == "greeting":
+    # if classification == "greeting":
+    if classification == "yes":
         intro_summary = generate_greeting_response(
             "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
             session_id
@@ -806,7 +813,8 @@ def query():
     #     }
     #     return jsonify(payload)
 
-    elif classification == "content_answerable":
+    # elif classification == "content_answerable":
+    else:
         # Generate the primary answer
         answer = answer_question(message, session_id)
         conversation_history[session_id]["messages"].append(("bot", answer))
