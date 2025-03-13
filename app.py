@@ -230,7 +230,7 @@ def classify_query(message, session_id):
     Classify the incoming message into one of three categories:
       - greeting
       - content_answerable
-      - human_TA_query
+      - human_TA_query (not included rn)
       
     A query is considered 'content_answerable' if it can be answered solely based on the content of the uploaded research paper.
     A query is 'human_TA_query' if it includes topics that require human judgment (e.g. ambiguous deadlines, scheduling, or info not covered in the paper).
@@ -246,7 +246,8 @@ def classify_query(message, session_id):
     classification = classification.lower().strip()
     print(f"DEBUG: Query classified as: {classification}")
     # If the classification doesn't match our expected labels, default to content_answerable.
-    if classification in ["greeting", "content_answerable", "human_ta_query"]:
+    # if classification in ["greeting", "content_answerable", "human_ta_query"]:
+    if classification in ["greeting", "content_answerable"]:
         return classification
     return "content_answerable"
 
@@ -284,22 +285,22 @@ def generate_suggested_question(student_question):
     print("END OF SUGGESTED QUESTION")
     return result, suggested_question_clean
 
-def should_ask_ta(query, session_id):
-    """
-    Use an LLM to determine whether additional clarification is needed by the TA.
-    The prompt now explicitly instructs the LLM to flag queries about deadlines,
-    submission dates, or scheduling as requiring human TA intervention.
-    """
-    prompt = (
-        f"Analyze the following query and decide if it requires human TA intervention for additional clarification, "
-        f"or if it can be answered using only the information contained in the uploaded PDF in this session.\n\n"
-        f"Query: \"{query}\"\n\n"
-        "If the query mentions deadlines, submission dates, or scheduling, reply with 'ask TA'. "
-        "If the query is answerable using only the PDF content, reply with 'answerable'."
-    )
-    response = generate_response(prompt, session_id)
-    print(f"DEBUG: should_ask_ta response for session {session_id}: {response}")
-    return "ask ta" in response.lower()
+# def should_ask_ta(query, session_id):
+#     """
+#     Use an LLM to determine whether additional clarification is needed by the TA.
+#     The prompt now explicitly instructs the LLM to flag queries about deadlines,
+#     submission dates, or scheduling as requiring human TA intervention.
+#     """
+#     prompt = (
+#         f"Analyze the following query and decide if it requires human TA intervention for additional clarification, "
+#         f"or if it can be answered using only the information contained in the uploaded PDF in this session.\n\n"
+#         f"Query: \"{query}\"\n\n"
+#         "If the query mentions deadlines, submission dates, or scheduling, reply with 'ask TA'. "
+#         "If the query is answerable using only the PDF content, reply with 'answerable'."
+#     )
+#     response = generate_response(prompt, session_id)
+#     print(f"DEBUG: should_ask_ta response for session {session_id}: {response}")
+#     return "ask ta" in response.lower()
 
 # -----------------------------------------------------------------------------
 # Response Building Functions
@@ -773,36 +774,36 @@ def query():
         interactive_payload = show_menu(greeting_msg, session_id)
         return jsonify(interactive_payload)
 
-    elif classification == "human_ta_query":
-        # Immediately trigger TA flow: prompt the student to confirm if they'd like human assistance.
-        answer = "It appears that this question might require additional clarification. Would you like to ask your TA for more details?"
-        conversation_history[session_id]["awaiting_ta_confirmation"] = True
-        payload = {
-            "text": answer,
-            "session_id": session_id,
-            "attachments": [
-                {
-                    "title": "Ask your TA for clarification:",
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Yes",
-                            "msg": "yes",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "No",
-                            "msg": "no",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ]
-        }
-        return jsonify(payload)
+    # elif classification == "human_ta_query":
+    #     # Immediately trigger TA flow: prompt the student to confirm if they'd like human assistance.
+    #     answer = "It appears that this question might require additional clarification. Would you like to ask your TA for more details?"
+    #     conversation_history[session_id]["awaiting_ta_confirmation"] = True
+    #     payload = {
+    #         "text": answer,
+    #         "session_id": session_id,
+    #         "attachments": [
+    #             {
+    #                 "title": "Ask your TA for clarification:",
+    #                 "actions": [
+    #                     {
+    #                         "type": "button",
+    #                         "text": "Yes",
+    #                         "msg": "yes",
+    #                         "msg_in_chat_window": True,
+    #                         "msg_processing_type": "sendMessage"
+    #                     },
+    #                     {
+    #                         "type": "button",
+    #                         "text": "No",
+    #                         "msg": "no",
+    #                         "msg_in_chat_window": True,
+    #                         "msg_processing_type": "sendMessage"
+    #                     }
+    #                 ]
+    #             }
+    #         ]
+    #     }
+    #     return jsonify(payload)
 
     elif classification == "content_answerable":
         # Generate the primary answer
