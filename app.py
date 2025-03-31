@@ -351,14 +351,14 @@ def build_interactive_response(response_text, session_id):
                         "type": "button",
                         "text": "Summarize Abstract",
                         "msg": "summarize_abstract",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Summarize Full Paper",
                         "msg": "summarize_full",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     }
                 ]
@@ -371,7 +371,7 @@ def build_interactive_response(response_text, session_id):
                         "type": "button",
                         "text": "Ask a TA",
                         "msg": "ask_TA",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     }
                 ]
@@ -391,14 +391,14 @@ def build_menu_response():
                         "type": "button",
                         "text": "Summarize Abstract",
                         "msg": "summarize_abstract",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Summarize Full Paper",
                         "msg": "summarize_full",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     }
                 ]
@@ -410,14 +410,14 @@ def build_menu_response():
                         "type": "button",
                         "text": "Ask a TA",
                         "msg": "ask_TA",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Choose Personality",
                         "msg": "choose_personality",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     }
                 ]
@@ -436,56 +436,56 @@ def build_personality_response():
                         "type": "button",
                         "text": "Default",
                         "msg": "personality_default",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Straightforward",
                         "msg": "personality_straightforward",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Critical",
                         "msg": "personality_critical",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Empathetic",
                         "msg": "personality_empathetic",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Other",
                         "msg": "personality_other",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     }
                     ]}]
     }
 
-def add_personality_button(response_payload):
-    # Replace any attachments with just the Personality button
-    response_payload["attachments"] = [
-        {
-            "actions": [
-                {
-                    "type": "button",
-                    "text": "Choose Personality",
-                    "msg": "choose_personality",
-                    "msg_in_chat_window": True,
-                    "msg_processing_type": "sendMessage"
-                }
-            ]
-        }
-    ]
-    return response_payload
+# def add_personality_button(response_payload):
+#     # Replace any attachments with just the Personality button
+#     response_payload["attachments"] = [
+#         {
+#             "actions": [
+#                 {
+#                     "type": "button",
+#                     "text": "Choose Personality",
+#                     "msg": "choose_personality",
+#                     "msg_in_chat_window": True,
+#                     "msg_processing_type": "sendMessage"
+#                 }
+#             ]
+#         }
+#     ]
+#     return response_payload
 
 def show_menu(response_text, session_id):
     return {
@@ -498,7 +498,7 @@ def show_menu(response_text, session_id):
                         "type": "button",
                         "text": "Menu",
                         "msg": "menu",
-                        "msg_in_chat_window": True,
+                        "msg_in_chat_window": False,
                         "msg_processing_type": "sendMessage"
                     }
                 ]
