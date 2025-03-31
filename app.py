@@ -114,15 +114,44 @@ def ensure_pdf_processed(session_id):
 # LLM Generation Functions
 # -----------------------------------------------------------------------------
 def generate_response(prompt, session_id):
-    """
-    Generate a response based on the prompt using a fixed system prompt.
-    """
-    system_prompt = (
-        "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-        "As a TA, you challenge students to practice critical thinking and question "
-        "assumptions about the research paper. Your knowledge is based solely on the "
-        "research paper that was uploaded in this session."
-    )
+    # """
+    # Generate a response based on the prompt using a fixed system prompt.
+    # """
+    # system_prompt = (
+    #     "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+    #     "As a TA, you challenge students to practice critical thinking and question "
+    #     "assumptions about the research paper. Your knowledge is based solely on the "
+    #     "research paper that was uploaded in this session."
+    # )
+    personality = conversation_history.get(session_id, {}).get("personality", "default")
+    
+    # Choose the system prompt based on the personality.
+    if personality == "critical":
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you challenge students to think deeply and question assumptions. "
+            "Provide thorough analysis and constructive criticism in your responses."
+            "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
+        )
+    elif personality == "empathetic":
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you are caring and supportive, offering kind explanations and understanding of complex topics."
+            "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
+        )
+    elif personality == "straightforward":
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you provide clear and concise answers without unnecessary details."
+            "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
+        )
+    else:
+        # Default personality
+        system_prompt = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "As a TA, you want to encourage students to think critically and learn more by providing insightful answers. "
+            "After answering the student's query, ask a follow-up question that prompts them to reflect further or explore the topic more deeply."
+        )
 
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
     response = generate(
@@ -383,11 +412,80 @@ def build_menu_response():
                         "msg": "ask_TA",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Choose Personality",
+                        "msg": "choose_personality",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
                     }
                 ]
             }
         ]
     }
+
+def build_personality_response():
+    return {
+        "text": "Select a personality:",
+        "attachments": [
+            {
+                "title": "Select an option:",
+                "actions": [
+                    {
+                        "type": "button",
+                        "text": "Default",
+                        "msg": "personality_default",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Straightforward",
+                        "msg": "personality_straightforward",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Critical",
+                        "msg": "personality_critical",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Empathetic",
+                        "msg": "personality_empathetic",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Other",
+                        "msg": "personality_other",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    }
+                    ]}]
+    }
+
+def add_personality_button(response_payload):
+    # Replace any attachments with just the Personality button
+    response_payload["attachments"] = [
+        {
+            "actions": [
+                {
+                    "type": "button",
+                    "text": "Choose Personality",
+                    "msg": "choose_personality",
+                    "msg_in_chat_window": True,
+                    "msg_processing_type": "sendMessage"
+                }
+            ]
+        }
+    ]
+    return response_payload
 
 def show_menu(response_text, session_id):
     return {
@@ -777,6 +875,18 @@ def query():
     if message in ["summarize_abstract", "summarize_full"]:
         summary = summarizing_agent(message, session_id)
         return jsonify(add_menu_button({"text": summary, "session_id": session_id}))
+    
+    # if the user selects a personality, 
+    if message == "choose_personality":
+        return jsonify(build_personality_response())
+    
+    # Handle messages from personality option buttons.
+    if message.startswith("personality_"):
+        personality_value = message.replace("personality_", "")
+        conversation_history[session_id]["personality"] = personality_value
+        confirmation = f"Personality set to: {personality_value.capitalize()}. You may now continue your conversation."
+        payload = {"text": confirmation, "session_id": session_id}
+        return jsonify(add_menu_button(payload))
     
     # Process general chatbot queries
     conversation_history[session_id]["messages"].append(("user", message))
