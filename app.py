@@ -338,46 +338,46 @@ def generate_suggested_question(student_question):
 # -----------------------------------------------------------------------------
 # Response Building Functions
 # -----------------------------------------------------------------------------
-def build_interactive_response(response_text, session_id):
-    """Build interactive response payload with summary and TA options."""
-    return {
-        "text": response_text,
-        "attachments": [
-            {
-                "title": "Would you like a summary?",
-                "text": "Select an option:",
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Summarize Abstract",
-                        "msg": "summarize_abstract",
-                        "msg_in_chat_window": False,
-                        "msg_processing_type": "sendMessage"
-                    },
-                    {
-                        "type": "button",
-                        "text": "Summarize Full Paper",
-                        "msg": "summarize_full",
-                        "msg_in_chat_window": False,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            },
-            {
-                "title": "Ask a TA",
-                "text": "Do you have a question for your TA?",
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Ask a TA",
-                        "msg": "ask_TA",
-                        "msg_in_chat_window": False,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            }
-        ]
-    }
+# def build_interactive_response(response_text, session_id):
+#     """Build interactive response payload with summary and TA options."""
+#     return {
+#         "text": response_text,
+#         "attachments": [
+#             {
+#                 "title": "Would you like a summary?",
+#                 "text": "Select an option:",
+#                 "actions": [
+#                     {
+#                         "type": "button",
+#                         "text": "Summarize Abstract",
+#                         "msg": "summarize_abstract",
+#                         "msg_in_chat_window": False,
+#                         "msg_processing_type": "sendMessage"
+#                     },
+#                     {
+#                         "type": "button",
+#                         "text": "Summarize Full Paper",
+#                         "msg": "summarize_full",
+#                         "msg_in_chat_window": False,
+#                         "msg_processing_type": "sendMessage"
+#                     }
+#                 ]
+#             },
+#             {
+#                 "title": "Ask a TA",
+#                 "text": "Do you have a question for your TA?",
+#                 "actions": [
+#                     {
+#                         "type": "button",
+#                         "text": "Ask a TA",
+#                         "msg": "ask_TA",
+#                         "msg_in_chat_window": False,
+#                         "msg_processing_type": "sendMessage"
+#                     }
+#                 ]
+#             }
+#         ]
+#     }
 
 def build_menu_response():
     """Return the full interactive menu."""
@@ -391,14 +391,14 @@ def build_menu_response():
                         "type": "button",
                         "text": "Summarize Abstract",
                         "msg": "summarize_abstract",
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Summarize Full Paper",
                         "msg": "summarize_full",
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
                 ]
@@ -410,14 +410,14 @@ def build_menu_response():
                         "type": "button",
                         "text": "Ask a TA",
                         "msg": "ask_TA",
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Choose Personality",
                         "msg": "choose_personality",
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
                 ]
@@ -436,21 +436,21 @@ def build_personality_response():
                         "type": "button",
                         "text": "Default",
                         "msg": "personality_default",
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Straightforward",
                         "msg": "personality_straightforward",
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "Critical",
                         "msg": "personality_critical",
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
                     {
@@ -464,7 +464,7 @@ def build_personality_response():
                         "type": "button",
                         "text": "Other",
                         "msg": "personality_other",
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
                     ]}]
