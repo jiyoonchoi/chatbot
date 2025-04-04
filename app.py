@@ -435,7 +435,8 @@ def build_personality_response():
                     {
                         "type": "button",
                         "text": "Default",
-                        "msg": "personality_default",
+                        # "msg": "personality_default",
+                        "payload": {"command": "set_personality", "value": "default"},
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
