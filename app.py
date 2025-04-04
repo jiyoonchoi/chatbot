@@ -179,36 +179,33 @@ def generate_greeting_response(prompt, session_id):
 
 def generate_follow_up(session_id):
     """
-    Generate a follow-up question based on the conversation history.
-    This function analyzes previous messages and uses an LLM call to generate
-    a follow-up question that encourages the student to reflect further.
-    If no follow-up is appropriate, it returns an empty string.
+    Dynamically generate a follow-up question that:
+      - references the conversation context
+      - invites the user to specify what they want to explore further
     """
-    # Build conversation context from history
     messages = conversation_history.get(session_id, {}).get("messages", [])
     if not messages:
         return ""
-    
-    # Create a textual summary of the conversation so far.
+
+    # Build a textual summary of the conversation so far.
     context = "\n".join([f"{speaker}: {msg}" for speaker, msg in messages])
-    
-    followup_prompt = (
-        "Based on the conversation so far, generate a follow-up question that "
-        "encourages the student to think more critically about the research paper. "
-        "If it doesn't make sense to ask a follow-up question, return an empty string.\n\n"
+
+    prompt = (
+        "Based on the conversation so far, craft a single follow-up prompt that invites the user "
+        "to elaborate or clarify what they want to explore further in the paper. If the conversation "
+        "does not logically require a follow-up, return an empty string.\n\n"
         "Conversation:\n" + context
     )
-    
     system_prompt = (
-        "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-        "Your role is to help students practice critical thinking by asking follow-up questions about the research paper."
+        "You are a TA chatbot that generates follow-up questions based on context. "
+        "Encourage the student to clarify or broaden their exploration of the research paper, "
+        "mentioning aspects like methodology, findings, or next steps if relevant."
     )
-    
-    print(f"DEBUG: Sending follow-up prompt for session {session_id}: {followup_prompt}")
+
     response = generate(
         model='4o-mini',
         system=system_prompt,
-        query=followup_prompt,
+        query=prompt,
         temperature=0.0,
         lastk=5,
         session_id=f"{session_id}_followup",
@@ -216,39 +213,96 @@ def generate_follow_up(session_id):
         rag_threshold=0.3,
         rag_k=5
     )
-    
+
     if isinstance(response, dict):
         result = response.get("response", "").strip()
     else:
         result = response.strip()
-    
-    print(f"DEBUG: Follow-up question for session {session_id}: {result}")
+
+    # Optionally, you could decide to return "" if the LLM suggests a question not relevant or empty.
     return result
 
 def classify_query(message, session_id):
     """
-    Classify the incoming message into one of three categories:
+    Classify the user's message into categories. Normally, we have:
       - greeting
       - content_answerable
-      - human_TA_query (not included rn)
-      
-    A query is considered 'content_answerable' if it can be answered solely based on the content of the uploaded research paper.
-    A query is 'human_TA_query' if it includes topics that require human judgment (e.g. ambiguous deadlines, scheduling, or info not covered in the paper).
+      - human_TA_query
+
+    However, if the bot is currently awaiting a follow-up response,
+    we expand our categories to also include:
+      - followup_decline
+      - followup_continue
+      - new_topic
+
+    We do all of this in a single classification call, using
+    context from the conversation_history to help the LLM decide.
     """
+
+    # Get the conversation so far
+    messages = conversation_history.get(session_id, {}).get("messages", [])
+    conversation_text = "\n".join([f"{speaker}: {msg}" for speaker, msg in messages])
+
+    # Check if we're expecting a follow-up response
+    if conversation_history[session_id].get("awaiting_followup_response"):
+        # If so, we instruct the LLM to classify among an expanded set of labels.
+        prompt = f"""
+                    We are in the middle of a conversation about a research paper, and I (the TA chatbot)
+                    recently asked a follow-up question. The conversation so far is:
+                    ---
+                    {conversation_text}
+                    ---
+                    The user just said: "{message}"
+
+                    Please classify the user's message into EXACTLY ONE of these categories:
+
+                    1) "followup_decline": The user wants to skip or end this follow-up topic.
+                    2) "followup_continue": The user is still on the same follow-up topic, clarifying or asking more.
+                    3) "new_topic": The user is shifting to a completely different topic.
+                    4) "greeting": The user is just greeting ("hello", "hi", "hey", etc.).
+                    5) "content_answerable": The user's question can be answered by the PDF content.
+                    6) "human_ta_query": The user is asking about deadlines, scheduling, or other info not in the PDF.
+
+                    Return only the label. No extra text.
+                """
+
+        classification_response = generate_response(prompt, session_id).lower().strip()
+
+        # Match to known labels or default to content_answerable if unrecognized
+        if "followup_decline" in classification_response:
+            return "followup_decline"
+        elif "followup_continue" in classification_response:
+            return "followup_continue"
+        elif "new_topic" in classification_response:
+            return "new_topic"
+        elif "greeting" in classification_response:
+            return "greeting"
+        elif "content_answerable" in classification_response:
+            return "content_answerable"
+        elif "human_ta_query" in classification_response:
+            return "human_ta_query"
+        else:
+            return "content_answerable"
+
+    # ----------------------------------------------------------------------
+    # If we're NOT awaiting a follow-up, we do your original classification
+    # ----------------------------------------------------------------------
     prompt = (
-        "Classify the following query into one of these categories: 'greeting', 'content_answerable', or 'human_TA_query'. "
+        "Classify the following query into one of these categories: 'greeting', "
+        "'content_answerable', or 'human_TA_query'. "
         "If the query is a greeting, answer with 'greeting'. "
-        "If the query can be answered solely based on the uploaded research paper, answer with 'content_answerable'. "
-        "If the query involves deadlines, scheduling, or requires additional human judgment beyond the paper's content, answer with 'human_TA_query'.\n\n"
+        "If the query can be answered solely based on the uploaded research paper, "
+        "answer with 'content_answerable'. "
+        "If the query involves deadlines, scheduling, or requires additional human judgment, "
+        "answer with 'human_TA_query'.\n\n"
         f"Query: \"{message}\""
     )
-    classification = generate_response(prompt, session_id)
-    classification = classification.lower().strip()
-    print(f"DEBUG: Query classified as: {classification}")
-    # If the classification doesn't match our expected labels, default to content_answerable.
-    # if classification in ["greeting", "content_answerable", "human_ta_query"]:
-    if classification in ["greeting", "content_answerable"]:
+    classification = generate_response(prompt, session_id).lower().strip()
+
+    if classification in ["greeting", "content_answerable", "human_ta_query"]:
         return classification
+
+    # Default if unrecognized
     return "content_answerable"
 
 def generate_suggested_question(student_question):
@@ -760,6 +814,52 @@ def query():
     classification = classify_query(message, session_id)
     print(f"DEBUG: User query classified as: {classification}")
 
+    # -------------------------------------------
+    # 1) Handle the new follow-up categories first
+    # -------------------------------------------
+    if classification == "followup_decline":
+        # The user is declining further discussion of the follow-up topic
+        conversation_history[session_id]["awaiting_followup_response"] = False
+        decline_text = "No problem! Let me know if you have any other questions."
+        conversation_history[session_id]["messages"].append(("bot", decline_text))
+        return jsonify(add_menu_button({
+            "text": decline_text,
+            "session_id": session_id
+        }))
+
+    elif classification == "followup_continue":
+        # The user wants to keep talking about the same topic.
+        # Instead of just prompting "Could you tell me more specifically what you'd like to clarify?"
+        # we can do something more productive.
+        
+        # 1) Provide an actual content-based answer, using answer_question
+        # (assuming the user is repeating their interest in "features and functionalities")
+        answer = answer_question(message, session_id)
+        conversation_history[session_id]["messages"].append(("bot", answer))
+        
+        # 2) Optionally generate another follow-up or ask if they'd like more details
+        # but let's keep it simple so we don't loop forever
+        continue_text = "Let me know if you'd like more details or if you have a different question."
+        conversation_history[session_id]["messages"].append(("bot", continue_text))
+        
+        # 3) IMPORTANT: Mark that we've handled the follow-up, so we don't loop
+        conversation_history[session_id]["awaiting_followup_response"] = False
+        
+        return jsonify(add_menu_button({
+            "text": f"{answer}\n\n{continue_text}",
+            "session_id": session_id
+        }))
+
+    elif classification == "new_topic":
+        # The user is pivoting away from the old follow-up
+        conversation_history[session_id]["awaiting_followup_response"] = False
+        # We now proceed to check if the new message also requires an answer from the PDF
+        # For simplicity, let's let the normal flow continue below
+        pass
+
+    # ---------------------------------------
+    # 2) Handle the usual categories (if not a follow-up)
+    # ---------------------------------------
     if classification == "greeting":
         intro_summary = generate_greeting_response(
             "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
@@ -810,13 +910,19 @@ def query():
         answer = answer_question(message, session_id)
         conversation_history[session_id]["messages"].append(("bot", answer))
         
-        # Optionally generate a follow-up question based on conversation history
-        follow_up = generate_follow_up(session_id)
-        if follow_up:
-            conversation_history[session_id]["messages"].append(("bot", follow_up))
-            answer += f"\n\n{follow_up}"
-        
-        payload = {"text": answer, "session_id": session_id}
+        # Dynamically generate an open-ended follow-up based on the conversation.
+        universal_followup = generate_follow_up(session_id)
+        if universal_followup:
+            conversation_history[session_id]["awaiting_followup_response"] = True
+            conversation_history[session_id]["messages"].append(("bot", universal_followup))
+            answer_with_prompt = f"{answer}\n\n{universal_followup}"
+        else:
+            answer_with_prompt = answer
+    
+        payload = {
+            "text": answer_with_prompt,
+            "session_id": session_id
+        }
         return jsonify(add_menu_button(payload))
 
     return jsonify(add_menu_button({
