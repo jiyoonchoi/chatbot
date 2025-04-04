@@ -458,7 +458,7 @@ def build_personality_response():
                         "type": "button",
                         "text": "Empathetic",
                         "msg": "personality_empathetic",
-                        "msg_in_chat_window": False,
+                        "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
                     {
