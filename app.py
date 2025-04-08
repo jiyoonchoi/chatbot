@@ -562,7 +562,7 @@ def summarizing_agent(action_type, session_id):
     Agent to summarize the abstract or the full paper based on the action type.
     """
     # cache = summary_abstract_cache if action_type == "quick_summary" else summary_full_cache
-    cache = summary_abstract_cache if action_type == "quick_summary"
+    cache = summary_abstract_cache
     if session_id in cache:
         return cache[session_id]
     if not ensure_pdf_processed(session_id):
