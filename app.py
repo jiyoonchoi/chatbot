@@ -371,15 +371,8 @@ def build_interactive_response(response_text, session_id):
                 "actions": [
                     {
                         "type": "button",
-                        "text": "Summarize Abstract",
-                        "msg": "summarize_abstract",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    },
-                    {
-                        "type": "button",
-                        "text": "Summarize Full Paper",
-                        "msg": "summarize_full",
+                        "text": "Quick Summary",
+                        "msg": "quick_summary",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
@@ -411,18 +404,11 @@ def build_menu_response():
                 "actions": [
                     {
                         "type": "button",
-                        "text": "Summarize Abstract",
-                        "msg": "summarize_abstract",
+                        "text": "Quick Summary",
+                        "msg": "quick_summary",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
-                    {
-                        "type": "button",
-                        "text": "Summarize Full Paper",
-                        "msg": "summarize_full",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
                 ]
             },
             {
@@ -554,29 +540,29 @@ def summarizing_agent(action_type, session_id):
     """
     Agent to summarize the abstract or the full paper based on the action type.
     """
-    cache = summary_abstract_cache if action_type == "summarize_abstract" else summary_full_cache
+    cache = summary_abstract_cache if action_type == "quick_summary" else summary_full_cache
     if session_id in cache:
         return cache[session_id]
     if not ensure_pdf_processed(session_id):
         return "PDF processing is not complete. Please try again shortly."
     
-    if action_type == "summarize_abstract":
+    if action_type == "quick_summary":
         prompt = (
             "Based solely on the research paper that was uploaded in this session, "
             "please provide a detailed summary focusing on the abstract. "
             "Include the main objectives and key points of the abstract."
         )
-    elif action_type == "summarize_full":
-        prompt = (
-            "Based solely on the research paper that was uploaded in this session, please provide a comprehensive and well-organized summary of the entire paper. "
-            "Your summary should include the following sections with clear bullet points:\n\n"
-            "1. **Title & Publication Details:** List the paper's title, authors, publication venue, and year.\n\n"
-            "2. **Abstract & Problem Statement:** Summarize the abstract, highlighting the key challenges and the motivation behind the study.\n\n"
-            "3. **Methodology:** Describe the research methods, experimental setup, and techniques used in the paper.\n\n"
-            "4. **Key Findings & Results:** Outline the major results, findings, and any evaluations or experiments conducted.\n\n"
-            "5. **Conclusions & Future Work:** Summarize the conclusions, implications of the study, and suggestions for future research.\n\n"
-            "Please present your summary using clear headings and bullet points or numbered lists where appropriate."
-        )
+    # elif action_type == "summarize_full":
+    #     prompt = (
+    #         "Based solely on the research paper that was uploaded in this session, please provide a comprehensive and well-organized summary of the entire paper. "
+    #         "Your summary should include the following sections with clear bullet points:\n\n"
+    #         "1. **Title & Publication Details:** List the paper's title, authors, publication venue, and year.\n\n"
+    #         "2. **Abstract & Problem Statement:** Summarize the abstract, highlighting the key challenges and the motivation behind the study.\n\n"
+    #         "3. **Methodology:** Describe the research methods, experimental setup, and techniques used in the paper.\n\n"
+    #         "4. **Key Findings & Results:** Outline the major results, findings, and any evaluations or experiments conducted.\n\n"
+    #         "5. **Conclusions & Future Work:** Summarize the conclusions, implications of the study, and suggestions for future research.\n\n"
+    #         "Please present your summary using clear headings and bullet points or numbered lists where appropriate."
+    #     )
     else:
         return "Invalid summarization action."
     
@@ -825,7 +811,7 @@ def query():
             "session_id": session_id
         })
     
-    if message in ["summarize_abstract", "summarize_full"]:
+    if message in ["quick_summary"]:
         summary = summarizing_agent(message, session_id)
         return jsonify(add_menu_button({"text": summary, "session_id": session_id}))
     
@@ -882,8 +868,8 @@ def query():
     # ---------------------------------------
     if classification == "greeting":
         def prepopulate_summaries(session_id):
-            summarizing_agent("summarize_abstract", session_id)
-            summarizing_agent("summarize_full", session_id)
+            summarizing_agent("quick_summary", session_id)
+            # summarizing_agent("summarize_full", session_id)
             
         intro_summary = generate_greeting_response(
             "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
