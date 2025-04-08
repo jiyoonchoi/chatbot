@@ -606,7 +606,8 @@ def answer_question(question, session_id):
         f"answer the following question:\n\n{question}\n, do **not** provide a direct answer. "
         "Instead, guide the student to the section where they can find this answer (such as the methods or results), "
         "and encourage them to think about why this information matters when applicable."
-        "Keep the response concise."
+        "Limit the length of the response and keep language concise."
+        "Bold key words in the response."
         "Provide the answer using only the content of the uploaded PDF."
     )
     return generate_response(prompt, session_id)
