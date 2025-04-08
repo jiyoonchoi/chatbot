@@ -117,12 +117,21 @@ def generate_response(prompt, session_id):
     """
     Generate a response based on the prompt using a fixed system prompt.
     """
+    # system_prompt = (
+    #     "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+    #     "As a TA, you challenge students to practice critical thinking and question "
+    #     "assumptions about the research paper. Your knowledge is based solely on the "
+    #     "research paper that was uploaded in this session."
+    # )
     system_prompt = (
         "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-        "As a TA, you challenge students to practice critical thinking and question "
-        "assumptions about the research paper. Your knowledge is based solely on the "
-        "research paper that was uploaded in this session."
+        "Your role is to guide students in developing their own understanding of the research paper. "
+        "Rather than giving direct answers, encourage students to think critically. "
+        "Offer hints, pose questions, and suggest where in the paper they can look (e.g., methodology, introduction, findings). "
+        "Do not summarize the entire answer; instead, promote thoughtful engagement with the content. "
+        "Your responses should be grounded solely in the research paper uploaded for this session."
     )
+
 
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
     response = generate(
@@ -152,12 +161,19 @@ def generate_greeting_response(prompt, session_id):
     Generate a greeting response without any follow-up question.
     This function uses a system prompt that omits any instruction to ask follow-up questions.
     """
+    # system_prompt = (
+    #     "As a TA chatbot for CS-150: Generative AI for Social Impact, "
+    #     "your job is to help the student think critically about the research paper. "
+    #     "Provide a concise answer based solely on the research paper that was uploaded in this session. "
+    #     "Do not include any follow-up questions in your response."
+    # )
     system_prompt = (
-        "As a TA chatbot for CS-150: Generative AI for Social Impact, "
-        "your job is to help the student think critically about the research paper. "
-        "Provide a concise answer based solely on the research paper that was uploaded in this session. "
-        "Do not include any follow-up questions in your response."
-    )
+    "As a TA chatbot for CS-150: Generative AI for Social Impact, your goal is to support students in understanding the research paper through critical thinking. "
+    "Provide a brief, general overview to orient them, but avoid summarizing too much. "
+    "Encourage them to explore specific sections of the paper for more detail, and avoid giving full answers. "
+    "Do not include follow-up questions."
+)
+
     
     print(f"DEBUG: Sending greeting prompt for session {session_id}: {prompt}")
     response = generate(
@@ -197,10 +213,15 @@ def generate_follow_up(session_id):
         "does not logically require a follow-up, return an empty string.\n\n"
         "Conversation:\n" + context
     )
+    # system_prompt = (
+    #     "You are a TA chatbot that generates follow-up questions based on context. "
+    #     "Encourage the student to clarify or broaden their exploration of the research paper, "
+    #     "mentioning aspects like methodology, findings, or next steps if relevant."
+    # )
     system_prompt = (
-        "You are a TA chatbot that generates follow-up questions based on context. "
-        "Encourage the student to clarify or broaden their exploration of the research paper, "
-        "mentioning aspects like methodology, findings, or next steps if relevant."
+        "You are a TA chatbot that encourages students to think more deeply about the research paper. "
+        "Craft a follow-up question that helps the student examine aspects such as the paper’s assumptions, evidence, methodology, or implications. "
+        "Avoid answering for them—instead, prompt them to explore further."
     )
 
     response = generate(
@@ -360,39 +381,39 @@ def generate_suggested_question(student_question):
 # -----------------------------------------------------------------------------
 # Response Building Functions
 # -----------------------------------------------------------------------------
-def build_interactive_response(response_text, session_id):
-    """Build interactive response payload with summary and TA options."""
-    return {
-        "text": response_text,
-        "attachments": [
-            {
-                "title": "Would you like a summary?",
-                "text": "Select an option:",
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Quick Summary",
-                        "msg": "quick_summary",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            },
-            {
-                "title": "Ask a TA",
-                "text": "Do you have a question for your TA?",
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Ask a TA",
-                        "msg": "ask_TA",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            }
-        ]
-    }
+# def build_interactive_response(response_text, session_id):
+#     """Build interactive response payload with summary and TA options."""
+#     return {
+#         "text": response_text,
+#         "attachments": [
+#             {
+#                 "title": "Would you like a summary?",
+#                 "text": "Select an option:",
+#                 "actions": [
+#                     {
+#                         "type": "button",
+#                         "text": "Quick Summary",
+#                         "msg": "quick_summary",
+#                         "msg_in_chat_window": True,
+#                         "msg_processing_type": "sendMessage"
+#                     }
+#                 ]
+#             },
+#             {
+#                 "title": "Ask a TA",
+#                 "text": "Do you have a question for your TA?",
+#                 "actions": [
+#                     {
+#                         "type": "button",
+#                         "text": "Ask a TA",
+#                         "msg": "ask_TA",
+#                         "msg_in_chat_window": True,
+#                         "msg_processing_type": "sendMessage"
+#                     }
+#                 ]
+#             }
+#         ]
+#     }
 
 def build_menu_response():
     """Return the full interactive menu."""
@@ -540,7 +561,8 @@ def summarizing_agent(action_type, session_id):
     """
     Agent to summarize the abstract or the full paper based on the action type.
     """
-    cache = summary_abstract_cache if action_type == "quick_summary" else summary_full_cache
+    # cache = summary_abstract_cache if action_type == "quick_summary" else summary_full_cache
+    cache = summary_abstract_cache if action_type == "quick_summary"
     if session_id in cache:
         return cache[session_id]
     if not ensure_pdf_processed(session_id):
