@@ -117,12 +117,25 @@ def generate_response(prompt, session_id):
     """
     Generate a response based on the prompt using a fixed system prompt.
     """
+    # system_prompt = (
+    #     "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+    #     "As a TA, you challenge students to practice critical thinking and question "
+    #     "assumptions about the research paper. Your knowledge is based solely on the "
+    #     "research paper that was uploaded in this session."
+    # )
     system_prompt = (
         "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-        "As a TA, you challenge students to practice critical thinking and question "
-        "assumptions about the research paper. Your knowledge is based solely on the "
-        "research paper that was uploaded in this session."
+        "Your role is to guide students in developing their own understanding of the research paper. "
+        "Rather than giving direct answers, encourage students to think critically. "
+        "Do NOT directly answer questions with specific numbers, names, or results. "
+        "Instead, guide students toward where they can find the information in the paper (e.g., introduction, methods section, results, discussion). "
+        "Do not summarize the entire answer; instead, promote thoughtful engagement with the content. "
+        "Encourage them to reflect on why that information is relevant and how it connects to the paper's broader goals."
+        "Your responses should be grounded solely in the research paper uploaded for this session. "
+        "Please keep answers concise unless otherwise specified."
+    
     )
+
 
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
     response = generate(
@@ -152,12 +165,19 @@ def generate_greeting_response(prompt, session_id):
     Generate a greeting response without any follow-up question.
     This function uses a system prompt that omits any instruction to ask follow-up questions.
     """
+    # system_prompt = (
+    #     "As a TA chatbot for CS-150: Generative AI for Social Impact, "
+    #     "your job is to help the student think critically about the research paper. "
+    #     "Provide a concise answer based solely on the research paper that was uploaded in this session. "
+    #     "Do not include any follow-up questions in your response."
+    # )
     system_prompt = (
-        "As a TA chatbot for CS-150: Generative AI for Social Impact, "
-        "your job is to help the student think critically about the research paper. "
-        "Provide a concise answer based solely on the research paper that was uploaded in this session. "
-        "Do not include any follow-up questions in your response."
-    )
+    "As a TA chatbot for CS-150: Generative AI for Social Impact, your goal is to support students in understanding the research paper through critical thinking. "
+    "Provide a brief, general overview to orient them, but avoid summarizing too much. "
+    "Encourage them to explore specific sections of the paper for more detail, and avoid giving full answers. "
+    "Do not include follow-up questions."
+)
+
     
     print(f"DEBUG: Sending greeting prompt for session {session_id}: {prompt}")
     response = generate(
@@ -197,10 +217,15 @@ def generate_follow_up(session_id):
         "does not logically require a follow-up, return an empty string.\n\n"
         "Conversation:\n" + context
     )
+    # system_prompt = (
+    #     "You are a TA chatbot that generates follow-up questions based on context. "
+    #     "Encourage the student to clarify or broaden their exploration of the research paper, "
+    #     "mentioning aspects like methodology, findings, or next steps if relevant."
+    # )
     system_prompt = (
-        "You are a TA chatbot that generates follow-up questions based on context. "
-        "Encourage the student to clarify or broaden their exploration of the research paper, "
-        "mentioning aspects like methodology, findings, or next steps if relevant."
+        "You are a TA chatbot that encourages students to think more deeply about the research paper. "
+        "Craft a follow-up question that helps the student examine aspects such as the paper’s assumptions, evidence, methodology, or implications. "
+        "Avoid answering for them—instead, prompt them to explore further."
     )
 
     response = generate(
@@ -360,46 +385,39 @@ def generate_suggested_question(student_question):
 # -----------------------------------------------------------------------------
 # Response Building Functions
 # -----------------------------------------------------------------------------
-def build_interactive_response(response_text, session_id):
-    """Build interactive response payload with summary and TA options."""
-    return {
-        "text": response_text,
-        "attachments": [
-            {
-                "title": "Would you like a summary?",
-                "text": "Select an option:",
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Summarize Abstract",
-                        "msg": "summarize_abstract",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    },
-                    {
-                        "type": "button",
-                        "text": "Summarize Full Paper",
-                        "msg": "summarize_full",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            },
-            {
-                "title": "Ask a TA",
-                "text": "Do you have a question for your TA?",
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Ask a TA",
-                        "msg": "ask_TA",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            }
-        ]
-    }
+# def build_interactive_response(response_text, session_id):
+#     """Build interactive response payload with summary and TA options."""
+#     return {
+#         "text": response_text,
+#         "attachments": [
+#             {
+#                 "title": "Would you like a summary?",
+#                 "text": "Select an option:",
+#                 "actions": [
+#                     {
+#                         "type": "button",
+#                         "text": "Quick Summary",
+#                         "msg": "quick_summary",
+#                         "msg_in_chat_window": True,
+#                         "msg_processing_type": "sendMessage"
+#                     }
+#                 ]
+#             },
+#             {
+#                 "title": "Ask a TA",
+#                 "text": "Do you have a question for your TA?",
+#                 "actions": [
+#                     {
+#                         "type": "button",
+#                         "text": "Ask a TA",
+#                         "msg": "ask_TA",
+#                         "msg_in_chat_window": True,
+#                         "msg_processing_type": "sendMessage"
+#                     }
+#                 ]
+#             }
+#         ]
+#     }
 
 def build_menu_response():
     """Return the full interactive menu."""
@@ -411,18 +429,11 @@ def build_menu_response():
                 "actions": [
                     {
                         "type": "button",
-                        "text": "Summarize Abstract",
-                        "msg": "summarize_abstract",
+                        "text": "Quick Summary",
+                        "msg": "quick_summary",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
-                    {
-                        "type": "button",
-                        "text": "Summarize Full Paper",
-                        "msg": "summarize_full",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
                 ]
             },
             {
@@ -554,29 +565,30 @@ def summarizing_agent(action_type, session_id):
     """
     Agent to summarize the abstract or the full paper based on the action type.
     """
-    cache = summary_abstract_cache if action_type == "summarize_abstract" else summary_full_cache
+    # cache = summary_abstract_cache if action_type == "quick_summary" else summary_full_cache
+    cache = summary_abstract_cache
     if session_id in cache:
         return cache[session_id]
     if not ensure_pdf_processed(session_id):
         return "PDF processing is not complete. Please try again shortly."
     
-    if action_type == "summarize_abstract":
+    if action_type == "quick_summary":
         prompt = (
             "Based solely on the research paper that was uploaded in this session, "
             "please provide a detailed summary focusing on the abstract. "
             "Include the main objectives and key points of the abstract."
         )
-    elif action_type == "summarize_full":
-        prompt = (
-            "Based solely on the research paper that was uploaded in this session, please provide a comprehensive and well-organized summary of the entire paper. "
-            "Your summary should include the following sections with clear bullet points:\n\n"
-            "1. **Title & Publication Details:** List the paper's title, authors, publication venue, and year.\n\n"
-            "2. **Abstract & Problem Statement:** Summarize the abstract, highlighting the key challenges and the motivation behind the study.\n\n"
-            "3. **Methodology:** Describe the research methods, experimental setup, and techniques used in the paper.\n\n"
-            "4. **Key Findings & Results:** Outline the major results, findings, and any evaluations or experiments conducted.\n\n"
-            "5. **Conclusions & Future Work:** Summarize the conclusions, implications of the study, and suggestions for future research.\n\n"
-            "Please present your summary using clear headings and bullet points or numbered lists where appropriate."
-        )
+    # elif action_type == "summarize_full":
+    #     prompt = (
+    #         "Based solely on the research paper that was uploaded in this session, please provide a comprehensive and well-organized summary of the entire paper. "
+    #         "Your summary should include the following sections with clear bullet points:\n\n"
+    #         "1. **Title & Publication Details:** List the paper's title, authors, publication venue, and year.\n\n"
+    #         "2. **Abstract & Problem Statement:** Summarize the abstract, highlighting the key challenges and the motivation behind the study.\n\n"
+    #         "3. **Methodology:** Describe the research methods, experimental setup, and techniques used in the paper.\n\n"
+    #         "4. **Key Findings & Results:** Outline the major results, findings, and any evaluations or experiments conducted.\n\n"
+    #         "5. **Conclusions & Future Work:** Summarize the conclusions, implications of the study, and suggestions for future research.\n\n"
+    #         "Please present your summary using clear headings and bullet points or numbered lists where appropriate."
+    #     )
     else:
         return "Invalid summarization action."
     
@@ -591,7 +603,11 @@ def answer_question(question, session_id):
         return "PDF processing is not complete. Please try again shortly."
     prompt = (
         f"Based solely on the research paper that was uploaded in this session, "
-        f"answer the following question:\n\n{question}\n\n"
+        f"answer the following question:\n\n{question}\n, do **not** provide a direct answer. "
+        "Instead, guide the student to the section where they can find this answer (such as the methods or results), "
+        "and encourage them to think about why this information matters when applicable."
+        "Limit the length of the response and keep language concise."
+        "Bold key words in the response."
         "Provide the answer using only the content of the uploaded PDF."
     )
     return generate_response(prompt, session_id)
@@ -825,7 +841,7 @@ def query():
             "session_id": session_id
         })
     
-    if message in ["summarize_abstract", "summarize_full"]:
+    if message in ["quick_summary"]:
         summary = summarizing_agent(message, session_id)
         return jsonify(add_menu_button({"text": summary, "session_id": session_id}))
     
@@ -882,8 +898,8 @@ def query():
     # ---------------------------------------
     if classification == "greeting":
         def prepopulate_summaries(session_id):
-            summarizing_agent("summarize_abstract", session_id)
-            summarizing_agent("summarize_full", session_id)
+            summarizing_agent("quick_summary", session_id)
+            # summarizing_agent("summarize_full", session_id)
             
         intro_summary = generate_greeting_response(
             "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
