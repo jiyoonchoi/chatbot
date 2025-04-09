@@ -26,7 +26,6 @@ MSG_ENDPOINT = os.getenv("msgEndPoint")
 
 # Global caches (session-specific)
 summary_abstract_cache = {}
-summary_full_cache = {}
 processed_pdf = {}
 pdf_ready = {}
 conversation_history = {}
@@ -39,7 +38,7 @@ app = Flask(__name__)
 def get_session_id(data):
     """Generate a session id based on the user name."""
     user = data.get("user_name", "unknown_user").strip().lower()
-    return f"session_{user}"
+    return f"session_{user}_twips"
 
 # -----------------------------------------------------------------------------
 # PDF Handling Functions
@@ -86,7 +85,7 @@ def wait_for_pdf_readiness(session_id, max_attempts=10, delay=5):
             "Based solely on the research paper that was uploaded in this session, "
             "what is the title of the paper?"
         )
-        test_response = generate_response(test_prompt, session_id)
+        test_response = generate_response("", test_prompt, session_id)
         print(f"DEBUG: Test response (Attempt {attempt+1}): {test_response}")
         if ("unable to access" not in test_response.lower() and 
             "i don't have the capability" not in test_response.lower()):
@@ -113,40 +112,34 @@ def ensure_pdf_processed(session_id):
 # -----------------------------------------------------------------------------
 # LLM Generation Functions
 # -----------------------------------------------------------------------------
-def generate_response(prompt, session_id):
+def generate_response(system, prompt, session_id):
     """
     Generate a response based on the prompt using a fixed system prompt.
     """
-    # system_prompt = (
-    #     "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-    #     "As a TA, you challenge students to practice critical thinking and question "
-    #     "assumptions about the research paper. Your knowledge is based solely on the "
-    #     "research paper that was uploaded in this session."
-    # )
-    system_prompt = (
-        "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-        "Your role is to guide students in developing their own understanding of the research paper. "
-        "Rather than giving direct answers, encourage students to think critically. "
-        "Do NOT directly answer questions with specific numbers, names, or results. "
-        "Instead, guide students toward where they can find the information in the paper (e.g., introduction, methods section, results, discussion). "
-        "Do not summarize the entire answer; instead, promote thoughtful engagement with the content. "
-        "Encourage them to reflect on why that information is relevant and how it connects to the paper's broader goals."
-        "Your responses should be grounded solely in the research paper uploaded for this session. "
-        "Please keep answers concise unless otherwise specified."
-    
-    )
 
+    if not system:
+        system = (
+            "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+            "Your role is to guide students in developing their own understanding of the research paper. "
+            "Rather than giving direct answers, encourage students to think critically. "
+            "Do NOT directly answer questions with specific numbers, names, or results. "
+            "Instead, guide students toward where they can find the information in the paper (e.g., introduction, methods section, results, discussion). "
+            "Do not summarize the entire answer; instead, promote thoughtful engagement with the content. "
+            "Encourage them to reflect on why that information is relevant and how it connects to the paper's broader goals."
+            "Your responses should be grounded solely in the research paper uploaded for this session. "
+            "Please keep answers concise unless otherwise specified."
+        )
 
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
     response = generate(
         model='4o-mini',
-        system=system_prompt,
+        system=system,
         query=prompt,
         temperature=0.0,
         lastk=5,
         session_id=session_id,
         rag_usage=True,
-        rag_threshold=0.3,
+        rag_threshold=0.1,
         rag_k=5
     )
     if isinstance(response, dict):
@@ -154,7 +147,8 @@ def generate_response(prompt, session_id):
         rag_context = response.get('rag_context', None)
         print(f"DEBUG: Received response for session {session_id}: {result}")
         if rag_context:
-            print(f"DEBUG: RAG context for session {session_id}: {rag_context}")
+            # print(f"DEBUG: RAG context for session {session_id}: {rag_context}")
+            pass
     else:
         result = response.strip()
         print(f"DEBUG: Received response for session {session_id}: {result}")
@@ -292,7 +286,7 @@ def classify_query(message, session_id):
                     Return only the label. No extra text.
                 """
 
-        classification_response = generate_response(prompt, session_id).lower().strip()
+        classification_response = generate_response("", prompt, session_id).lower().strip()
 
         # Match to known labels or default to content_answerable if unrecognized
         if "followup_decline" in classification_response:
@@ -323,13 +317,33 @@ def classify_query(message, session_id):
         "answer with 'human_TA_query'.\n\n"
         f"Query: \"{message}\""
     )
-    classification = generate_response(prompt, session_id).lower().strip()
+    classification = generate_response("", prompt, session_id).lower().strip()
 
     if classification in ["greeting", "content_answerable", "human_ta_query"]:
         return classification
 
     # Default if unrecognized
     return "content_answerable"
+
+def classify_difficulty_of_question(question, session_id):
+    """
+    Determine whether this 'content_answerable' question is purely factual
+    (like a simple numeric or name lookup) or conceptual (requires
+    reasoning, interpretation, or explanation).
+    Return either 'factual' or 'conceptual'.
+    """
+    prompt = f"""
+    The user asked: "{question}"
+    Categorize the question strictly as either 'factual' or 'conceptual' based on the research paper context:
+    - 'factual' means it requests a direct fact (a number, a name, a specific piece of data) with little to no interpretation.
+    - 'conceptual' means it requires interpretation, explanation, or analysis beyond a single data point or name.
+    Return only 'factual' or 'conceptual'.
+    """
+    classification_response = generate_response("", prompt, session_id).lower().strip()
+    if "factual" in classification_response:
+        return "factual"
+    else:
+        return "conceptual"
   
 def generate_suggested_question(student_question):
     """
@@ -364,60 +378,6 @@ def generate_suggested_question(student_question):
     print(f"DEBUG: Suggested question: {result}")
     print("END OF SUGGESTED QUESTION")
     return result, suggested_question_clean
-
-# def should_ask_ta(query, session_id):
-#     """
-#     Use an LLM to determine whether additional clarification is needed by the TA.
-#     The prompt now explicitly instructs the LLM to flag queries about deadlines,
-#     submission dates, or scheduling as requiring human TA intervention.
-#     """
-#     prompt = (
-#         f"Analyze the following query and decide if it requires human TA intervention for additional clarification, "
-#         f"or if it can be answered using only the information contained in the uploaded PDF in this session.\n\n"
-#         f"Query: \"{query}\"\n\n"
-#         "If the query mentions deadlines, submission dates, or scheduling, reply with 'ask TA'. "
-#         "If the query is answerable using only the PDF content, reply with 'answerable'."
-#     )
-#     response = generate_response(prompt, session_id)
-#     print(f"DEBUG: should_ask_ta response for session {session_id}: {response}")
-#     return "ask ta" in response.lower()
-
-# -----------------------------------------------------------------------------
-# Response Building Functions
-# -----------------------------------------------------------------------------
-# def build_interactive_response(response_text, session_id):
-#     """Build interactive response payload with summary and TA options."""
-#     return {
-#         "text": response_text,
-#         "attachments": [
-#             {
-#                 "title": "Would you like a summary?",
-#                 "text": "Select an option:",
-#                 "actions": [
-#                     {
-#                         "type": "button",
-#                         "text": "Quick Summary",
-#                         "msg": "quick_summary",
-#                         "msg_in_chat_window": True,
-#                         "msg_processing_type": "sendMessage"
-#                     }
-#                 ]
-#             },
-#             {
-#                 "title": "Ask a TA",
-#                 "text": "Do you have a question for your TA?",
-#                 "actions": [
-#                     {
-#                         "type": "button",
-#                         "text": "Ask a TA",
-#                         "msg": "ask_TA",
-#                         "msg_in_chat_window": True,
-#                         "msg_processing_type": "sendMessage"
-#                     }
-#                 ]
-#             }
-#         ]
-#     }
 
 def build_menu_response():
     """Return the full interactive menu."""
@@ -559,13 +519,12 @@ def generate_intro_summary(session_id):
         "about the uploaded research paper: "
         "'I'm here to assist you with understanding this week's reading, which is about...'"
     )
-    return generate_response(prompt, session_id)
+    return generate_response("", prompt, session_id)
 
 def summarizing_agent(action_type, session_id):
     """
     Agent to summarize the abstract or the full paper based on the action type.
     """
-    # cache = summary_abstract_cache if action_type == "quick_summary" else summary_full_cache
     cache = summary_abstract_cache
     if session_id in cache:
         return cache[session_id]
@@ -593,7 +552,7 @@ def summarizing_agent(action_type, session_id):
         return "Invalid summarization action."
     
     print(f"DEBUG: creating first cache")
-    summary = generate_response(prompt, session_id)
+    summary = generate_response("", prompt, session_id)
     cache[session_id] = summary
     return summary
 
@@ -610,7 +569,55 @@ def answer_question(question, session_id):
         "Bold key words in the response."
         "Provide the answer using only the content of the uploaded PDF."
     )
-    return generate_response(prompt, session_id)
+    return generate_response("", prompt, session_id)
+
+def answer_factual_question(question, session_id):
+    """
+    Provide a direct factual answer from the PDF if possible,
+    with minimal prompting to the student to look deeper.
+    Specifically references 'TwIPS' so we don't mix up authors from references.
+    """
+    if not ensure_pdf_processed(session_id):
+        return "PDF processing is not complete. Please try again shortly."
+
+    # We explicitly mention the exact paper title so the LLM is much more likely
+    # to pull from the correct chunk, rather than from references to other works.
+    system_prompt = (
+        "You are a TA chatbot. If the user is asking a purely factual question "
+        "about the TwIPS paper (a large language model powered texting application "
+        "for autistic users), then provide the exact fact from the TwIPS paper. "
+        "Ignore any references or citations to other papers. "
+        "If the TwIPS paper doesn't state the fact clearly, say so."
+    )
+
+    prompt = (
+        "Based solely on the **TwIPS** paper titled: "
+        "\"TwIPS: A Large Language Model Powered Texting Application to Simplify Conversational Nuances "
+        "for Autistic Users,\" ignoring any other references or cited works:\n\n"
+        f"Question: {question}\n\n"
+        "If the paper does not clearly state it, say so."
+    )
+
+    return generate_response(system_prompt, prompt, session_id)
+
+def answer_conceptual_question(question, session_id):
+    """
+    Provide an answer that references where in the paper
+    the user might find the info, but encourages deeper reflection.
+    """
+    if not ensure_pdf_processed(session_id):
+        return "PDF processing is not complete. Please try again shortly."
+    
+    prompt = (
+        f"Based solely on the research paper that was uploaded in this session, "
+        f"answer the following question:\n\n"
+        f"{question}\n\n"
+        "Do NOT provide a direct numeric or word-for-word result. "
+        "Guide the student to the specific sections where they can find the information, "
+        "and prompt them to think about its significance or implications."
+    )
+    return generate_response("", prompt, session_id)
+
 
 # -----------------------------------------------------------------------------
 # Flask Route: Query Handling
@@ -637,7 +644,6 @@ def query():
         }
         # Clear caches for this session.
         summary_abstract_cache.pop(session_id, None)
-        summary_full_cache.pop(session_id, None)
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
     
@@ -645,7 +651,6 @@ def query():
     if message == "clear_history":
         conversation_history.pop(session_id, None)
         summary_abstract_cache.pop(session_id, None)
-        summary_full_cache.pop(session_id, None)
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
         return jsonify(add_menu_button({
@@ -916,39 +921,49 @@ def query():
 
         interactive_payload = show_menu(greeting_msg, session_id)
         return jsonify(interactive_payload)
+    
+    if classification == "content_answerable":
+        difficulty = classify_difficulty_of_question(message, session_id)
+        if difficulty == "factual":
+            classification = "content_factual"
+        else:
+            classification = "content_conceptual"
 
-    # elif classification == "human_ta_query":
-    #     # Immediately trigger TA flow: prompt the student to confirm if they'd like human assistance.
-    #     answer = "It appears that this question might require additional clarification. Would you like to ask your TA for more details?"
-    #     conversation_history[session_id]["awaiting_ta_confirmation"] = True
-    #     payload = {
-    #         "text": answer,
-    #         "session_id": session_id,
-    #         "attachments": [
-    #             {
-    #                 "title": "Ask your TA for clarification:",
-    #                 "actions": [
-    #                     {
-    #                         "type": "button",
-    #                         "text": "Yes",
-    #                         "msg": "yes",
-    #                         "msg_in_chat_window": True,
-    #                         "msg_processing_type": "sendMessage"
-    #                     },
-    #                     {
-    #                         "type": "button",
-    #                         "text": "No",
-    #                         "msg": "no",
-    #                         "msg_in_chat_window": True,
-    #                         "msg_processing_type": "sendMessage"
-    #                     }
-    #                 ]
-    #             }
-    #         ]
-    #     }
-    #     return jsonify(payload)
+    if classification == "content_factual":
+        answer = answer_factual_question(message, session_id)
+        conversation_history[session_id]["messages"].append(("bot", answer))
 
-    # elif classification == "content_answerable":
+        # Optionally generate a follow-up question (like you do for normal answers)
+        universal_followup = generate_follow_up(session_id)
+        if universal_followup:
+            conversation_history[session_id]["awaiting_followup_response"] = True
+            conversation_history[session_id]["messages"].append(("bot", universal_followup))
+            answer_with_prompt = f"{answer}\n\n{universal_followup}"
+        else:
+            answer_with_prompt = answer
+
+        return jsonify(add_menu_button({
+            "text": answer_with_prompt,
+            "session_id": session_id
+        }))
+
+    elif classification == "content_conceptual":
+        answer = answer_conceptual_question(message, session_id)
+        conversation_history[session_id]["messages"].append(("bot", answer))
+
+        universal_followup = generate_follow_up(session_id)
+        if universal_followup:
+            conversation_history[session_id]["awaiting_followup_response"] = True
+            conversation_history[session_id]["messages"].append(("bot", universal_followup))
+            answer_with_prompt = f"{answer}\n\n{universal_followup}"
+        else:
+            answer_with_prompt = answer
+
+        return jsonify(add_menu_button({
+            "text": answer_with_prompt,
+            "session_id": session_id
+        }))
+
     else:
         # Generate the primary answer
         answer = answer_question(message, session_id)
@@ -968,11 +983,6 @@ def query():
             "session_id": session_id
         }
         return jsonify(add_menu_button(payload))
-
-    return jsonify(add_menu_button({
-        "text": "Sorry, I didn't understand that.",
-        "session_id": session_id
-    }))
 
 # -----------------------------------------------------------------------------
 # Error Handling and App Runner
