@@ -40,7 +40,7 @@ app = Flask(__name__)
 def get_session_id(data):
     """Generate a session id based on the user name."""
     user = data.get("user_name", "unknown_user").strip().lower()
-    return f"session_{user}_twips"
+    return f"session_{user}_twips_research"
 
 # -----------------------------------------------------------------------------
 # PDF Handling Functions
@@ -728,6 +728,14 @@ def query():
    
     # Check if we are in the middle of a TA question workflow
     if conversation_history[session_id].get("question_flow"):
+        # If the user types the safeguard exit keyword "exit", cancel the TA flow.
+        if message.lower() == "exit":
+            conversation_history[session_id]["question_flow"] = None
+            return jsonify(add_menu_button({
+                "text": "Exiting TA query mode. How can I help you with the research paper?",
+                "session_id": session_id
+            }))
+        
         q_flow = conversation_history[session_id]["question_flow"]
         state = q_flow.get("state", "")
         
