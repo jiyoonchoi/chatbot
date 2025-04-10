@@ -805,6 +805,7 @@ def query():
 
         # Handling the decision in the refinement phase:
         if state == "awaiting_refinement_decision":
+            print(f"DEBUGGING****: {session_id} - {message}")
             if message.lower() == "approve":
                 q_flow["state"] = "awaiting_final_confirmation"
                 return jsonify({
@@ -819,6 +820,7 @@ def query():
                     ],
                     "session_id": session_id
                 })
+            
             elif message.lower() == "modify":
                 q_flow["state"] = "awaiting_feedback"
                 return jsonify({
@@ -842,7 +844,8 @@ def query():
             feedback = message
             # Combine the raw question and feedback to generate a refined version.
             prompt = f"Original question: \"{q_flow['raw_question']}\"\nFeedback: \"{feedback}\"\nGenerate a refined version of the question."
-            new_suggested = generate_response(prompt, session_id)
+            print(f"DEBUG in MODIFY: {session_id} - {prompt}")
+            new_suggested = generate_response("", prompt, session_id)
             q_flow["suggested_question"] = new_suggested
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
