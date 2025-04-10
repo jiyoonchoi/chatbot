@@ -345,29 +345,40 @@ def classify_difficulty_of_question(question, session_id):
     else:
         return "conceptual"
   
-def generate_suggested_question(student_question):
+def generate_suggested_question(student_question, feedback=None):
     """
     Generate a rephrased and clearer version of the student's question.
     """
-    prompt = (
-        f"Based on the following student question, generate a clearer and more concise version that does not reference any PDF content:\n\n"
-        f"Student question: \"{student_question}\"\n\n"
-        "Suggested improved question:"
-    )
+    if feedback:
+        prompt = (
+            f"Original question: \"{student_question}\"\n"
+            f"Feedback: \"{feedback}\"\n"
+            "Generate a refined and more comprehensive version of the question that incorporates the feedback, "
+            "including a reference to the TWIPs paper."
+        )
+    else:
+        prompt = (
+            f"Based on the following student question, generate a more comprehensive question that references the TWIPs paper\n\n"
+            f"Student question: \"{student_question}\"\n\n"
+            "Suggested improved question:"
+        )
+
     response = generate(
-         model='4o-mini',
-         system=(
-             "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-             "Rephrase the student's question to be clearer and more concise without referring to any external context."
-         ),
-         query=prompt,
-         temperature=0.0,
-         lastk=5,
-         session_id="suggestion_session",
-         rag_usage=False,  # RAG disabled
-         rag_threshold=0.3,
-         rag_k=0
+            model='4o-mini',
+            system=(
+                "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+                "Rephrase or refine the student's question to be clearer and more comprehensive, "
+                "incorporating any provided feedback and referring to the paper where relevant."
+            ),
+            query=prompt,
+            temperature=0.0,
+            lastk=5,
+            session_id="suggestion_session",
+            rag_usage=False,
+            rag_threshold=0.3,
+            rag_k=0
     )
+
     if isinstance(response, dict):
          result = response.get('response', '').strip()
     else:
@@ -850,13 +861,12 @@ def query():
         if state == "awaiting_feedback":
             feedback = message
             # Combine the raw question and feedback to generate a refined version.
-            prompt = f"Original question: \"{q_flow['raw_question']}\"\nFeedback: \"{feedback}\"\nGenerate a refined version of the question."
-            print(f"DEBUG in MODIFY: {session_id} - {prompt}")
-            new_suggested = generate_response("", prompt, session_id)
-            q_flow["suggested_question"] = new_suggested
+            base_question = q_flow.get("suggested_question", q_flow["raw_question"])
+            new_suggested, new_suggested_clean = generate_suggested_question(base_question, feedback)
+            q_flow["suggested_question"] = new_suggested_clean
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
-                "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested}\"\n\nDo you **approve**, want to **Modify**, or do a **Manual Edit**?",
+                "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested_clean}\"\n\nDo you **approve**, want to **Modify**, or do a **Manual Edit**?",
                 "attachments": [
                     {
                         "actions": [
