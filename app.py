@@ -853,7 +853,7 @@ def query():
             feedback = message
             # Combine the raw question and feedback to generate a refined version.
             prompt = f"Original question: \"{q_flow['raw_question']}\"\nFeedback: \"{feedback}\"\nGenerate a refined version of the question."
-            new_suggested = generate_response(prompt, session_id)
+            new_suggested = generate_response("", prompt, session_id)
             q_flow["suggested_question"] = new_suggested
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
