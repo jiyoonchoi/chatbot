@@ -280,24 +280,6 @@ def generate_suggested_question(student_question):
     print("END OF SUGGESTED QUESTION")
     return suggested_question_full, suggested_question_clean
 
-
-# def should_ask_ta(query, session_id):
-#     """
-#     Use an LLM to determine whether additional clarification is needed by the TA.
-#     The prompt now explicitly instructs the LLM to flag queries about deadlines,
-#     submission dates, or scheduling as requiring human TA intervention.
-#     """
-#     prompt = (
-#         f"Analyze the following query and decide if it requires human TA intervention for additional clarification, "
-#         f"or if it can be answered using only the information contained in the uploaded PDF in this session.\n\n"
-#         f"Query: \"{query}\"\n\n"
-#         "If the query mentions deadlines, submission dates, or scheduling, reply with 'ask TA'. "
-#         "If the query is answerable using only the PDF content, reply with 'answerable'."
-#     )
-#     response = generate_response(prompt, session_id)
-#     print(f"DEBUG: should_ask_ta response for session {session_id}: {response}")
-#     return "ask ta" in response.lower()
-
 # -----------------------------------------------------------------------------
 # Response Building Functions
 # -----------------------------------------------------------------------------
@@ -472,7 +454,9 @@ def send_direct_message_to_TA(question, session_id, ta_username):
                 "msg_processing_type": "sendMessage"
                 }
             ]
-        }]
+        }],
+        # Include the student session explicitly
+        "student_session": session_id
     }
     try:
         response = requests.post(msg_url, json=payload, headers=headers)
@@ -573,38 +557,6 @@ def answer_question(question, session_id):
     )
     return generate_response(prompt, session_id)
 
-# @app.route('/ta_response', methods=['POST'])
-# def ta_response():
-
-#     data = request.get_json() or request.form
-#     print("DEBUG: Received TA response data:", data)
-#     session_id = get_session_id(data)
-#     print(f"DEBUG: Session ID: {session_id}")
-#     ta_text = data.get("text")
-#     ta_username = data.get("ta_user_name") or (data.get("u", {}).get("username") if data.get("u") else None)
-    
-#     if session_id not in conversation_history:
-#         return jsonify({"error": "Invalid session ID"}), 400
-
-#     # If the TA clicked the "Respond to Student" button, the message should be "respond"
-#     if ta_text.lower() == "respond":
-#         # Set flag to await TA's typed answer.
-#         conversation_history[session_id]["awaiting_ta_response"] = True
-#         print(f"DEBUG: Session {session_id} is now awaiting TA response from {ta_username}")
-#         return jsonify({"status": "Please type your response to the student."})
-#     else:
-#         # If the system is awaiting a TA response, process the TA's reply.
-#         if conversation_history[session_id].get("awaiting_ta_response"):
-#             conversation_history[session_id]["awaiting_ta_response"] = False
-#             # Log the TA's reply
-#             conversation_history[session_id]["messages"].append(("TA", ta_text))
-#             print(f"DEBUG: Received TA reply for session {session_id}: {ta_text}")
-#             # Forward the TA's reply to the student.
-#             forward_message_to_student(ta_text, session_id, ta_username)
-#             return jsonify({"status": "TA response forwarded to student."})
-#         else:
-#             return jsonify({"error": "Not expecting a TA response at this time."}), 400
-
 
 # -----------------------------------------------------------------------------
 # Flask Route: Query Handling
@@ -615,6 +567,8 @@ def query():
     print(f"DEBUG: Received request data: {data}")
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
+    # student_session = data.get("student_session")
+    # print(f"*****DEBUG: User: {user}, Message: {message}, Student Session: {student_session}")
     
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
