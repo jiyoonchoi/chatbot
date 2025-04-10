@@ -384,10 +384,10 @@ def generate_suggested_question(student_question):
 def build_menu_response():
     """Return the full interactive menu."""
     return {
-        "text": "Select an option:",
+        "text": "Please feel free to ask a question about the research paper, or explore the menu below for more actions.:",
         "attachments": [
             {
-                "title": "Select an option:",
+                "title": "Please feel free to ask a question about the research paper, or explore the menu below for more actions.:",
                 "actions": [
                     {
                         "type": "button",
@@ -1021,8 +1021,7 @@ def query():
         )
         greeting_msg = (
             "Hello! I am the TA chatbot for CS-150: Generative AI for Social Impact. "
-            + intro_summary +
-            " Please feel free to ask a question about the research paper, or explore the menu below for more actions."
+            + intro_summary + "Please feel free to ask a question about the research paper, or explore the menu below for more actions."
         )
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
         
