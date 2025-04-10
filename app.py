@@ -1,4 +1,3 @@
-
 import os
 import uuid
 import time
@@ -40,7 +39,7 @@ app = Flask(__name__)
 def get_session_id(data):
     """Generate a session id based on the user name."""
     user = data.get("user_name", "unknown_user").strip().lower()
-    return f"session_{user}_twips"
+    return f"session_{user}_twips_research"
 
 # -----------------------------------------------------------------------------
 # PDF Handling Functions
@@ -73,11 +72,7 @@ def upload_pdf_if_needed(pdf_path, session_id):
         print(f"DEBUG: Exception in pdf_upload(): {e}")
         return False
 
-def wait_for_pdf_readiness(session_id, max_attempts=10, delay=5):
-    """
-    Poll until the PDF is indexed and its content is integrated.
-    We test by asking for the title and checking that a valid title is returned.
-    """
+def wait_for_pdf_readiness(session_id, max_attempts=20, delay=2):
     if pdf_ready.get(session_id):
         print(f"DEBUG: PDF already marked as ready for session {session_id}")
         return True
@@ -124,12 +119,14 @@ def generate_response(system, prompt, session_id):
             "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
             "Your role is to guide students in developing their own understanding of the research paper. "
             "Rather than giving direct answers, encourage students to think critically. "
+            "If the question is requesting for a summary of the paper, please provide a summary of the paper. Otherwise,"
             "Do NOT directly answer questions with specific numbers, names, or results. "
             "Instead, guide students toward where they can find the information in the paper (e.g., introduction, methods section, results, discussion). "
             "Do not summarize the entire answer; instead, promote thoughtful engagement with the content. "
             "Encourage them to reflect on why that information is relevant and how it connects to the paper's broader goals."
             "Your responses should be grounded solely in the research paper uploaded for this session. "
             "Please keep answers concise unless otherwise specified."
+            "Bold with surrounding '**' to any follow up questions so they are easily visible to the user."
         )
 
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
@@ -307,7 +304,7 @@ def classify_query(message, session_id):
             return "content_answerable"
 
     # ----------------------------------------------------------------------
-    # If we're NOT awaiting a follow-up, we do your original classification
+    # If we're NOT awaiting a follow-up, we do original classification
     # ----------------------------------------------------------------------
     prompt = (
         "Classify the following query into one of these categories: 'greeting', "
@@ -347,42 +344,33 @@ def classify_difficulty_of_question(question, session_id):
     else:
         return "conceptual"
   
-
-def generate_suggested_question(student_question, feedback=None):
-    if feedback:
-        prompt = (
-            f"Original question: \"{student_question}\"\n"
-            f"Feedback: \"{feedback}\"\n"
-            "Generate a refined and more comprehensive version of the question that incorporates the feedback, "
-            "including a reference to the TWIPs paper."
-        )
-    else:
-        prompt = (
-            f"Based on the following student question, generate a more comprehensive question that references the TWIPs paper\n\n"
-            f"Student question: \"{student_question}\"\n\n"
-            "Suggested improved question:"
-        )
-
-    response = generate(
-            model='4o-mini',
-            system=(
-                "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-                "Rephrase or refine the student's question to be clearer and more comprehensive, "
-                "incorporating any provided feedback and referring to the paper where relevant."
-            ),
-            query=prompt,
-            temperature=0.0,
-            lastk=5,
-            session_id="suggestion_session",
-            rag_usage=False,
-            rag_threshold=0.3,
-            rag_k=0
+def generate_suggested_question(student_question):
+    """
+    Generate a rephrased and clearer version of the student's question.
+    """
+    prompt = (
+        f"Based on the following student question, generate a clearer and more concise version that does not reference any PDF content:\n\n"
+        f"Student question: \"{student_question}\"\n\n"
+        "Suggested improved question:"
     )
-
+    response = generate(
+         model='4o-mini',
+         system=(
+             "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+             "Rephrase the student's question to be clearer and more concise without referring to any external context."
+         ),
+         query=prompt,
+         temperature=0.0,
+         lastk=5,
+         session_id="suggestion_session",
+         rag_usage=False,  # RAG disabled
+         rag_threshold=0.3,
+         rag_k=0
+    )
     if isinstance(response, dict):
-            result = response.get('response', '').strip()
+         result = response.get('response', '').strip()
     else:
-            result = response.strip()
+         result = response.strip()
     # Optionally extract a quoted sentence if present
     match = re.search(r'"(.*?)"', result)
     suggested_question_clean = match.group(1) if match else result
@@ -393,15 +381,15 @@ def generate_suggested_question(student_question, feedback=None):
 def build_menu_response():
     """Return the full interactive menu."""
     return {
-        "text": "Select an option:",
+        "text": "Please feel free to ask a question about the research paper, or explore the menu below for more actions:",
         "attachments": [
             {
-                "title": "Select an option:",
+                "title": "Please feel free to ask a question about the research paper, or explore the menu below for more actions.:",
                 "actions": [
                     {
                         "type": "button",
                         "text": "Quick Summary",
-                        "msg": "quick_summary",
+                        "msg": "summarize",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
@@ -580,23 +568,12 @@ def summarizing_agent(action_type, session_id):
     if not ensure_pdf_processed(session_id):
         return "PDF processing is not complete. Please try again shortly."
     
-    if action_type == "quick_summary":
+    if action_type == "summarize":
         prompt = (
             "Based solely on the research paper that was uploaded in this session, "
-            "please provide a detailed summary focusing on the abstract. "
-            "Include the main objectives and key points of the abstract."
+            "please provide a detailed quick summary that is 3-4 sentences long, "
+            "including the main objectives, key points, and conclusions of the paper. "
         )
-    # elif action_type == "summarize_full":
-    #     prompt = (
-    #         "Based solely on the research paper that was uploaded in this session, please provide a comprehensive and well-organized summary of the entire paper. "
-    #         "Your summary should include the following sections with clear bullet points:\n\n"
-    #         "1. **Title & Publication Details:** List the paper's title, authors, publication venue, and year.\n\n"
-    #         "2. **Abstract & Problem Statement:** Summarize the abstract, highlighting the key challenges and the motivation behind the study.\n\n"
-    #         "3. **Methodology:** Describe the research methods, experimental setup, and techniques used in the paper.\n\n"
-    #         "4. **Key Findings & Results:** Outline the major results, findings, and any evaluations or experiments conducted.\n\n"
-    #         "5. **Conclusions & Future Work:** Summarize the conclusions, implications of the study, and suggestions for future research.\n\n"
-    #         "Please present your summary using clear headings and bullet points or numbered lists where appropriate."
-    #     )
     else:
         return "Invalid summarization action."
     
@@ -645,6 +622,7 @@ def answer_factual_question(question, session_id):
         "for Autistic Users,\" ignoring any other references or cited works:\n\n"
         f"Question: {question}\n\n"
         "If the paper does not clearly state it, say so."
+        "Bold with surrounding '**' to any follow up questions so they are easily visible to the user."
     )
 
     return generate_response(system_prompt, prompt, session_id)
@@ -749,6 +727,14 @@ def query():
    
     # Check if we are in the middle of a TA question workflow
     if conversation_history[session_id].get("question_flow"):
+        # If the user types the safeguard exit keyword "exit", cancel the TA flow.
+        if message.lower() == "exit":
+            conversation_history[session_id]["question_flow"] = None
+            return jsonify(add_menu_button({
+                "text": "Exiting TA query mode. How can I help you with the research paper?",
+                "session_id": session_id
+            }))
+        
         q_flow = conversation_history[session_id]["question_flow"]
         state = q_flow.get("state", "")
         
@@ -802,7 +788,6 @@ def query():
             elif message.lower() == "refine":
                 # Default refine using LLM feedback
                 suggested = generate_suggested_question(q_flow["raw_question"])[0]
-                # suggested = generate_response("", f"Refine the following question: \"{q_flow['raw_question']}\"", session_id)
                 q_flow["suggested_question"] = suggested
                 q_flow["state"] = "awaiting_refinement_decision"
                 return jsonify({
@@ -826,6 +811,7 @@ def query():
 
         # Handling the decision in the refinement phase:
         if state == "awaiting_refinement_decision":
+            print(f"DEBUGGING****: {session_id} - {message}")
             if message.lower() == "approve":
                 q_flow["state"] = "awaiting_final_confirmation"
                 return jsonify({
@@ -840,6 +826,7 @@ def query():
                     ],
                     "session_id": session_id
                 })
+            
             elif message.lower() == "modify":
                 q_flow["state"] = "awaiting_feedback"
                 return jsonify({
@@ -861,15 +848,14 @@ def query():
         # State 3: Awaiting feedback for LLM refinement
         if state == "awaiting_feedback":
             feedback = message
-            # prompt = f"Original question: \"{q_flow['raw_question']}\"\nFeedback: \"{feedback}\"\nGenerate a refined version of the question. Only return the refined question."
-            # new_suggested = generate_response("", prompt, session_id)
-            base_question = q_flow.get("suggested_question", q_flow["raw_question"])
-            new_suggested, new_suggested_clean = generate_suggested_question(base_question, feedback)
-            # new_suggested, new_suggested_clean = generate_suggested_question(q_flow["raw_question"], feedback)
-            q_flow["suggested_question"] = new_suggested_clean
+            # Combine the raw question and feedback to generate a refined version.
+            prompt = f"Original question: \"{q_flow['raw_question']}\"\nFeedback: \"{feedback}\"\nGenerate a refined version of the question."
+            print(f"DEBUG in MODIFY: {session_id} - {prompt}")
+            new_suggested = generate_response("", prompt, session_id)
+            q_flow["suggested_question"] = new_suggested
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
-                "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested_clean}\"\n\nDo you **approve**, want to **Modify**, or do a **Manual Edit**?",
+                "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested}\"\n\nDo you **approve**, want to **Modify**, or do a **Manual Edit**?",
                 "attachments": [
                     {
                         "actions": [
@@ -978,7 +964,7 @@ def query():
     #         "session_id": session_id
     #     })
     
-    if message in ["quick_summary"]:
+    if message in ["summarize"]:
         summary = summarizing_agent(message, session_id)
         return jsonify(add_menu_button({"text": summary, "session_id": session_id}))
     
@@ -1035,8 +1021,7 @@ def query():
     # ---------------------------------------
     if classification == "greeting":
         def prepopulate_summaries(session_id):
-            summarizing_agent("quick_summary", session_id)
-            # summarizing_agent("summarize_full", session_id)
+            summarizing_agent("summarize", session_id)
             
         intro_summary = generate_greeting_response(
             "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
@@ -1044,13 +1029,10 @@ def query():
         )
         greeting_msg = (
             "Hello! I am the TA chatbot for CS-150: Generative AI for Social Impact. "
-            + intro_summary +
-            " Please feel free to ask a question about the research paper, or explore the menu below for more actions."
+            + intro_summary + "Please feel free to ask a question about the research paper, or explore the menu below for more actions."
         )
+        # Save and return the greeting without any follow-up questions, i.e. no food for thought.
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
-        
-        threading.Thread(target=prepopulate_summaries, args=(session_id,)).start()
-
         interactive_payload = show_menu(greeting_msg, session_id)
         return jsonify(interactive_payload)
     
