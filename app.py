@@ -468,6 +468,13 @@ def build_TA_button():
                         "msg": "ask_TA_Jiyoon",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Ask TA Amanda",
+                        "msg": "ask_TA_Amanda",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
                     }
                 ]
             }
@@ -706,8 +713,14 @@ def query():
         ta_button_response["session_id"] = session_id
         return jsonify(ta_button_response)
     
-    if message in ["ask_TA_Aya", "ask_TA_Jiyoon"]:
-        ta_selected = "Aya" if message == "ask_TA_Aya" else "Jiyoon"
+    if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
+        if message == "ask_TA_Aya":
+            ta_selected = "Aya"
+        elif message == "ask_TA_Jiyoon":
+            ta_selected = "Jiyoon"
+        else:
+            ta_selected = "Amanda"
+
         # Initialize question_flow state
         conversation_history[session_id]["question_flow"] = {
             "ta": ta_selected,
