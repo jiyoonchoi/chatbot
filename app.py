@@ -393,7 +393,7 @@ def build_menu_response():
                     {
                         "type": "button",
                         "text": "Quick Summary",
-                        "msg": "quick_summary",
+                        "msg": "summarize",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
@@ -572,7 +572,7 @@ def summarizing_agent(action_type, session_id):
     if not ensure_pdf_processed(session_id):
         return "PDF processing is not complete. Please try again shortly."
     
-    if action_type == "quick_summary":
+    if action_type == "summarize":
         prompt = (
             "Based solely on the research paper that was uploaded in this session, "
             "please provide a detailed quick summary that is 3-4 sentences long, "
@@ -961,7 +961,7 @@ def query():
     #         "session_id": session_id
     #     })
     
-    if message in ["quick_summary"]:
+    if message in ["summarize"]:
         summary = summarizing_agent(message, session_id)
         return jsonify(add_menu_button({"text": summary, "session_id": session_id}))
     
@@ -1018,7 +1018,7 @@ def query():
     # ---------------------------------------
     if classification == "greeting":
         def prepopulate_summaries(session_id):
-            summarizing_agent("quick_summary", session_id)
+            summarizing_agent("summarize", session_id)
             # summarizing_agent("summarize_full", session_id)
             
         intro_summary = generate_greeting_response(
