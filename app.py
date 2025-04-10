@@ -40,7 +40,7 @@ app = Flask(__name__)
 def get_session_id(data):
     """Generate a session id based on the user name."""
     user = data.get("user_name", "unknown_user").strip().lower()
-    return f"session_{user}_twips"
+    return f"session_{user}_twips_paper"
 
 # -----------------------------------------------------------------------------
 # PDF Handling Functions
