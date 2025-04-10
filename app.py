@@ -40,7 +40,7 @@ app = Flask(__name__)
 def get_session_id(data):
     """Generate a session id based on the user name."""
     user = data.get("user_name", "unknown_user").strip().lower()
-    return f"session_{user}_twips_paper"
+    return f"session_{user}_twips"
 
 # -----------------------------------------------------------------------------
 # PDF Handling Functions
@@ -73,11 +73,7 @@ def upload_pdf_if_needed(pdf_path, session_id):
         print(f"DEBUG: Exception in pdf_upload(): {e}")
         return False
 
-def wait_for_pdf_readiness(session_id, max_attempts=10, delay=5):
-    """
-    Poll until the PDF is indexed and its content is integrated.
-    We test by asking for the title and checking that a valid title is returned.
-    """
+def wait_for_pdf_readiness(session_id, max_attempts=20, delay=2):
     if pdf_ready.get(session_id):
         print(f"DEBUG: PDF already marked as ready for session {session_id}")
         return True
@@ -131,7 +127,7 @@ def generate_response(system, prompt, session_id):
             "Encourage them to reflect on why that information is relevant and how it connects to the paper's broader goals."
             "Your responses should be grounded solely in the research paper uploaded for this session. "
             "Please keep answers concise unless otherwise specified."
-            "For any questions you added at the end of the response, make sure you preface it with '**Food for thought 🤔 (no-reply)**:'"
+            "Bold with surrounding '**' to any follow up questions so they are easily visible to the user."
         )
 
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
@@ -309,7 +305,7 @@ def classify_query(message, session_id):
             return "content_answerable"
 
     # ----------------------------------------------------------------------
-    # If we're NOT awaiting a follow-up, we do your original classification
+    # If we're NOT awaiting a follow-up, we do original classification
     # ----------------------------------------------------------------------
     prompt = (
         "Classify the following query into one of these categories: 'greeting', "
@@ -386,7 +382,7 @@ def generate_suggested_question(student_question):
 def build_menu_response():
     """Return the full interactive menu."""
     return {
-        "text": "Please feel free to ask a question about the research paper, or explore the menu below for more actions.:",
+        "text": "Please feel free to ask a question about the research paper, or explore the menu below for more actions:",
         "attachments": [
             {
                 "title": "Please feel free to ask a question about the research paper, or explore the menu below for more actions.:",
@@ -619,7 +615,6 @@ def answer_factual_question(question, session_id):
         "for autistic users), then provide the exact fact from the TwIPS paper. "
         "Ignore any references or citations to other papers. "
         "If the TwIPS paper doesn't state the fact clearly, say so."
-        "For any questions you added at the end of the response, make sure you preface it with '**Food for thought 🤔 (no-reply)**:'"
     )
 
     prompt = (
@@ -628,7 +623,7 @@ def answer_factual_question(question, session_id):
         "for Autistic Users,\" ignoring any other references or cited works:\n\n"
         f"Question: {question}\n\n"
         "If the paper does not clearly state it, say so."
-        "For any questions you added at the end of the response, make sure you preface it with '**Food for thought 🤔 (no-reply)**:'"
+        "Bold with surrounding '**' to any follow up questions so they are easily visible to the user."
     )
 
     return generate_response(system_prompt, prompt, session_id)
@@ -1029,10 +1024,8 @@ def query():
             "Hello! I am the TA chatbot for CS-150: Generative AI for Social Impact. "
             + intro_summary + "Please feel free to ask a question about the research paper, or explore the menu below for more actions."
         )
+        # Save and return the greeting without any follow-up questions, i.e. no food for thought.
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
-        
-        threading.Thread(target=prepopulate_summaries, args=(session_id,)).start()
-
         interactive_payload = show_menu(greeting_msg, session_id)
         return jsonify(interactive_payload)
     
