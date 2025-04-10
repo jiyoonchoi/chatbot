@@ -574,20 +574,9 @@ def summarizing_agent(action_type, session_id):
     if action_type == "quick_summary":
         prompt = (
             "Based solely on the research paper that was uploaded in this session, "
-            "please provide a detailed summary focusing on the abstract. "
-            "Include the main objectives and key points of the abstract."
+            "please provide a detailed quick summary that is 3-4 sentences long, "
+            "including the main objectives, key points, and conclusions of the paper. "
         )
-    # elif action_type == "summarize_full":
-    #     prompt = (
-    #         "Based solely on the research paper that was uploaded in this session, please provide a comprehensive and well-organized summary of the entire paper. "
-    #         "Your summary should include the following sections with clear bullet points:\n\n"
-    #         "1. **Title & Publication Details:** List the paper's title, authors, publication venue, and year.\n\n"
-    #         "2. **Abstract & Problem Statement:** Summarize the abstract, highlighting the key challenges and the motivation behind the study.\n\n"
-    #         "3. **Methodology:** Describe the research methods, experimental setup, and techniques used in the paper.\n\n"
-    #         "4. **Key Findings & Results:** Outline the major results, findings, and any evaluations or experiments conducted.\n\n"
-    #         "5. **Conclusions & Future Work:** Summarize the conclusions, implications of the study, and suggestions for future research.\n\n"
-    #         "Please present your summary using clear headings and bullet points or numbered lists where appropriate."
-    #     )
     else:
         return "Invalid summarization action."
     
