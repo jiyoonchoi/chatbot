@@ -23,6 +23,7 @@ BOT_USER_ID = os.getenv("botUserId")
 BOT_AUTH_TOKEN = os.getenv("botToken")
 TA_USERNAME = os.getenv("taUserName")
 MSG_ENDPOINT = os.getenv("msgEndPoint")
+TA_USER_LIST = ["aya.ismail", "jiyoon.choi"]
 
 # Global caches (session-specific)
 summary_abstract_cache = {}
@@ -483,7 +484,7 @@ def send_direct_message_to_TA(question, session_id, ta_username):
 # TA-student Messaging Function (forward question to student)
 # -----------------------------------------------------------------------------
 
-def forward_message_to_student(ta_response, session_id, ta_username):
+def forward_message_to_student(ta_response, session_id):
     # Build a payload to send to the student.
     
     msg_url = MSG_ENDPOINT
@@ -493,7 +494,7 @@ def forward_message_to_student(ta_response, session_id, ta_username):
         "X-User-Id": BOT_USER_ID,
     }
 
-    message_text = f"Your TA {ta_username} says: '{ta_response}'"
+    message_text = f"Your TA says: '{ta_response}'"
     
     print(f"DEBUG: Forwarding message to student {session_id}: {message_text}")
     if session_id.startswith("session_"):
@@ -572,57 +573,37 @@ def answer_question(question, session_id):
     )
     return generate_response(prompt, session_id)
 
-@app.route('/ta_response', methods=['POST'])
-def ta_response():
-#     data = request.get_json() or request.form
-#     session_id = get_session_id(data)
-#     ta_message = data.get("text")
-#     ta_username = data.get("ta_user_name", "Unknown")
-    
-#     # Log the response for debugging:
-#     print(f"Received TA response for session {session_id}: {ta_message}")
-    
-#     # Retrieve the conversation for that session
-#     if session_id in conversation_history:
-#         # Append the TA's message to the conversation history:
-#         conversation_history[session_id]["messages"].append((ta_username, ta_message))
+# @app.route('/ta_response', methods=['POST'])
+# def ta_response():
 
-#         print(f"conversation history {conversation_history[session_id]['messages']}")
-       
-#         forward_message_to_student(ta_message, session_id, ta_username)
-#         return jsonify({"status": "success"})
-#     else:
-       
+#     data = request.get_json() or request.form
+#     print("DEBUG: Received TA response data:", data)
+#     session_id = get_session_id(data)
+#     print(f"DEBUG: Session ID: {session_id}")
+#     ta_text = data.get("text")
+#     ta_username = data.get("ta_user_name") or (data.get("u", {}).get("username") if data.get("u") else None)
+    
+#     if session_id not in conversation_history:
 #         return jsonify({"error": "Invalid session ID"}), 400
 
-    data = request.get_json() or request.form
-    print("DEBUG: Received TA response data:", data)
-    session_id = get_session_id(data)
-    print(f"DEBUG: Session ID: {session_id}")
-    ta_text = data.get("text")
-    ta_username = data.get("ta_user_name") or (data.get("u", {}).get("username") if data.get("u") else None)
-    
-    if session_id not in conversation_history:
-        return jsonify({"error": "Invalid session ID"}), 400
-
-    # If the TA clicked the "Respond to Student" button, the message should be "respond"
-    if ta_text.lower() == "respond":
-        # Set flag to await TA's typed answer.
-        conversation_history[session_id]["awaiting_ta_response"] = True
-        print(f"DEBUG: Session {session_id} is now awaiting TA response from {ta_username}")
-        return jsonify({"status": "Please type your response to the student."})
-    else:
-        # If the system is awaiting a TA response, process the TA's reply.
-        if conversation_history[session_id].get("awaiting_ta_response"):
-            conversation_history[session_id]["awaiting_ta_response"] = False
-            # Log the TA's reply
-            conversation_history[session_id]["messages"].append(("TA", ta_text))
-            print(f"DEBUG: Received TA reply for session {session_id}: {ta_text}")
-            # Forward the TA's reply to the student.
-            forward_message_to_student(ta_text, session_id, ta_username)
-            return jsonify({"status": "TA response forwarded to student."})
-        else:
-            return jsonify({"error": "Not expecting a TA response at this time."}), 400
+#     # If the TA clicked the "Respond to Student" button, the message should be "respond"
+#     if ta_text.lower() == "respond":
+#         # Set flag to await TA's typed answer.
+#         conversation_history[session_id]["awaiting_ta_response"] = True
+#         print(f"DEBUG: Session {session_id} is now awaiting TA response from {ta_username}")
+#         return jsonify({"status": "Please type your response to the student."})
+#     else:
+#         # If the system is awaiting a TA response, process the TA's reply.
+#         if conversation_history[session_id].get("awaiting_ta_response"):
+#             conversation_history[session_id]["awaiting_ta_response"] = False
+#             # Log the TA's reply
+#             conversation_history[session_id]["messages"].append(("TA", ta_text))
+#             print(f"DEBUG: Received TA reply for session {session_id}: {ta_text}")
+#             # Forward the TA's reply to the student.
+#             forward_message_to_student(ta_text, session_id, ta_username)
+#             return jsonify({"status": "TA response forwarded to student."})
+#         else:
+#             return jsonify({"error": "Not expecting a TA response at this time."}), 400
 
 
 # -----------------------------------------------------------------------------
@@ -646,7 +627,8 @@ def query():
     if session_id not in conversation_history:
         conversation_history[session_id] = {
             "messages": [],
-            "awaiting_ta_question": False
+            "question_flow": None,
+            "awaiting_ta_response": False
         }
         # Clear caches for this session.
         summary_abstract_cache.pop(session_id, None)
@@ -700,6 +682,12 @@ def query():
             "session_id": session_id
         })
     
+    if user in [u.lower() for u in TA_USER_LIST] and message.lower() == "respond":
+            # Process TA response prompt. For example, set flag and prompt for typed response.
+            conversation_history[session_id]["awaiting_ta_response"] = True
+            print(f"DEBUG: Session {session_id} is now awaiting TA response from {user}")
+            return jsonify({"status": "Please type your response to the student.", "session_id": session_id})
+   
     # Check if we are in the middle of a TA question workflow
     if conversation_history[session_id].get("question_flow"):
         q_flow = conversation_history[session_id]["question_flow"]
@@ -873,7 +861,14 @@ def query():
                     "text": "Please choose **confirm** to send or **cancel** to abort.",
                     "session_id": session_id
                 })
-
+        
+    if conversation_history[session_id].get("awaiting_ta_response"):
+        # Assume this message is the TA's typed answer.
+        conversation_history[session_id]["awaiting_ta_response"] = False
+        conversation_history[session_id]["messages"].append(("TA", message))
+        print(f"DEBUG: Received TA reply for session {session_id}: {message}")
+        forward_message_to_student(message, session_id)
+        return jsonify({"status": "TA response forwarded to student.", "session_id": session_id})
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
