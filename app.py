@@ -124,6 +124,7 @@ def generate_response(system, prompt, session_id):
             "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
             "Your role is to guide students in developing their own understanding of the research paper. "
             "Rather than giving direct answers, encourage students to think critically. "
+            "If the question is requesting for a summary of the paper, please provide a summary of the paper. Otherwise,"
             "Do NOT directly answer questions with specific numbers, names, or results. "
             "Instead, guide students toward where they can find the information in the paper (e.g., introduction, methods section, results, discussion). "
             "Do not summarize the entire answer; instead, promote thoughtful engagement with the content. "
@@ -1019,7 +1020,6 @@ def query():
     if classification == "greeting":
         def prepopulate_summaries(session_id):
             summarizing_agent("summarize", session_id)
-            # summarizing_agent("summarize_full", session_id)
             
         intro_summary = generate_greeting_response(
             "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
