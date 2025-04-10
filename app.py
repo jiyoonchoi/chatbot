@@ -1,3 +1,4 @@
+
 import os
 import uuid
 import time
@@ -23,6 +24,7 @@ BOT_USER_ID = os.getenv("botUserId")
 BOT_AUTH_TOKEN = os.getenv("botToken")
 TA_USERNAME = os.getenv("taUserName")
 MSG_ENDPOINT = os.getenv("msgEndPoint")
+TA_USER_LIST = ["aya.ismail", "jiyoon.choi"]
 
 # Global caches (session-specific)
 summary_abstract_cache = {}
@@ -468,13 +470,6 @@ def build_TA_button():
                         "msg": "ask_TA_Jiyoon",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
-                    },
-                    {
-                        "type": "button",
-                        "text": "Ask TA Amanda",
-                        "msg": "ask_TA_Amanda",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
                     }
                 ]
             }
@@ -482,7 +477,7 @@ def build_TA_button():
     }
 
 # -----------------------------------------------------------------------------
-# TA Messaging Function
+# TA Messaging Function (send message to TA)
 # -----------------------------------------------------------------------------
 def send_direct_message_to_TA(question, session_id, ta_username):
     """
@@ -497,13 +492,58 @@ def send_direct_message_to_TA(question, session_id, ta_username):
     message_text = f"Student '{session_id}' asks: {question}"
     payload = {
         "channel": f"@{ta_username}",
-        "text": message_text
+        "text": message_text,
+        "attachments": [
+            {
+            "actions": [
+                {
+                "type": "button",
+                "text": "Respond to Student",
+                "msg": "respond",
+                "msg_in_chat_window": True,
+                "msg_processing_type": "sendMessage"
+                }
+            ]
+        }],
+        # Include the student session explicitly
+        "student_session": session_id
     }
     try:
         response = requests.post(msg_url, json=payload, headers=headers)
         print("DEBUG: Direct message sent:", response.json())
     except Exception as e:
         print("DEBUG: Error sending direct message to TA:", e)
+
+# -----------------------------------------------------------------------------
+# TA-student Messaging Function (forward question to student)
+# -----------------------------------------------------------------------------
+
+def forward_message_to_student(ta_response, session_id):
+    # Build a payload to send to the student.
+    
+    msg_url = MSG_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "X-Auth-Token": BOT_AUTH_TOKEN,
+        "X-User-Id": BOT_USER_ID,
+    }
+
+    message_text = f"Your TA says: '{ta_response}'"
+    
+    print(f"DEBUG: Forwarding message to student {session_id}: {message_text}")
+    if session_id.startswith("session_"):
+        username = session_id[len("session_"):]
+    
+    payload = {
+        "channel": f"@{username}",
+        "text": message_text
+    }
+    
+    try:
+        response = requests.post(msg_url, json=payload, headers=headers)
+        print("DEBUG: TA Response forwarded to student:", response.json())
+    except Exception as e:
+        print("DEBUG: Error sending TA response to student:", e)
 
 # -----------------------------------------------------------------------------
 # Summarization and Question Answering Agents
@@ -639,8 +679,8 @@ def query():
     if session_id not in conversation_history:
         conversation_history[session_id] = {
             "messages": [],
-            "awaiting_ta_question": False,
-            "awaiting_ta_confirmation": False  # flag for TA confirmation
+            "question_flow": None,
+            "awaiting_ta_response": False
         }
         # Clear caches for this session.
         summary_abstract_cache.pop(session_id, None)
@@ -658,193 +698,273 @@ def query():
             "session_id": session_id
         }))
     
-    # -------------
-    # Process TA Confirmation Response
-    # -------------
-    if conversation_history[session_id].get("awaiting_ta_confirmation"):
-        if message.lower() in ["yes", "y"]:
-            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
-            ta_button_response = build_TA_button()
-            ta_button_response["session_id"] = session_id
-            return jsonify(ta_button_response)
-        else:
-            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
-            menu_response = build_menu_response()
-            menu_response["session_id"] = session_id
-            return jsonify({
-                "text": "Please feel free to ask a question about the research paper, or explore the menu below for more actions.",
-                "session_id": session_id,
-                **menu_response
-            })
-    
-    # Handling TA question flow when the student is typing their TA question.
-    if (conversation_history[session_id].get("awaiting_ta_question")
-        and message not in ["use_suggested_question", "keep_own", "confirm_send", "cancel_send"]):
-        
-        conversation_history[session_id]["student_question"] = message
-        suggested_full, suggested_clean = generate_suggested_question(message)
-        conversation_history[session_id]["suggested_question"] = suggested_full
-        conversation_history[session_id]["final_question"] = suggested_clean
-        
-        return jsonify({
-            "text": f"Here is a suggested question based on what you wrote:\n\n**{suggested_full}**\n\nWould you like to send this suggested question or keep your own?",
-            "attachments": [
-                {
-                    "title": "Select an option:",
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Use Suggested Question",
-                            "msg": "use_suggested_question",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "Keep My Own",
-                            "msg": "keep_own",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ],
-            "session_id": session_id
-        })
-    
-    if message == "use_suggested_question":
-        final_question = conversation_history[session_id].get("final_question", "No question available.")
-        return jsonify({
-            "text": f"You selected the suggested question:\n\n**{final_question}**\n\nDo you want to send this to the TA?",
-            "attachments": [
-                {
-                    "title": "Confirm sending:",
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Confirm Send",
-                            "msg": "confirm_send",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "Cancel",
-                            "msg": "cancel_send",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ],
-            "session_id": session_id
-        })
-    
-    if message == "keep_own":
-        final_question = conversation_history[session_id].get("student_question", "No question available.")
-        conversation_history[session_id]["final_question"] = final_question
-        return jsonify({
-            "text": f"Do you want to send your question:\n\n**{final_question}**\n\nto the TA?",
-            "attachments": [
-                {
-                    "title": "Confirm sending:",
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Confirm Send",
-                            "msg": "confirm_send",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "Cancel",
-                            "msg": "cancel_send",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ],
-            "session_id": session_id
-        })
-    
-    if message == "confirm_send":
-        ta_name = conversation_history[session_id].get("awaiting_ta_question")
-        if not ta_name:
-            return jsonify({"text": "No TA selected.", "session_id": session_id})
-        ta_username = "aya.ismail" if ta_name == "Aya" else "jiyoon.choi"
-        final_question = conversation_history[session_id].get("final_question")
-        if not final_question:
-            return jsonify({"text": "No final question available. Please provide a question for your TA.", "session_id": session_id})
-        send_direct_message_to_TA(final_question, user, ta_username)
-        confirmation = f"Your question has been sent to TA {ta_name}!"
-        conversation_history[session_id]["awaiting_ta_question"] = False
-        conversation_history[session_id].pop("student_question", None)
-        conversation_history[session_id].pop("suggested_question", None)
-        conversation_history[session_id].pop("final_question", None)
-        return jsonify(add_menu_button({
-            "text": confirmation,
-            "session_id": session_id
-        }))
-    
-    if message == "cancel_send":
-        conversation_history[session_id]["awaiting_ta_question"] = False
-        conversation_history[session_id].pop("student_question", None)
-        conversation_history[session_id].pop("suggested_question", None)
-        conversation_history[session_id].pop("final_question", None)
-        return jsonify(add_menu_button({
-            "text": "Your question was not sent. Let me know if you need anything else.",
-            "session_id": session_id
-        }))
-    
     if message == "menu":
         menu_response = build_menu_response()
         menu_response["session_id"] = session_id
         return jsonify(menu_response)
     
-    if message == "ask_TA":
-        # When the student clicks "Ask TA" from the clarification prompt,
-        # set a flag so that a follow-up "yes/no" response is expected.
-        conversation_history[session_id]["awaiting_ta_confirmation"] = True
-        return jsonify({
-            "text": "Would you like to ask your TA for further clarification? Please reply with 'yes' or 'no'.",
-            "session_id": session_id,
-            "attachments": [
-                {
-                    "title": "Confirm TA assistance:",
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Yes",
-                            "msg": "yes",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "No",
-                            "msg": "no",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }
-            ]
-        })
+     # ----------------------------
+    # TA Question Workflow
+    # ----------------------------
+
+    if message == "ask_TA": 
+
+        conversation_history[session_id]["awaiting_ta_question"] = False
+        conversation_history[session_id].pop("student_question", None)
+        conversation_history[session_id].pop("suggested_question", None)
+        conversation_history[session_id].pop("final_question", None)
+
+        ta_button_response = build_TA_button()
+        ta_button_response["session_id"] = session_id
+        return jsonify(ta_button_response)
     
-    if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
-        ta_mapping = {
-            "ask_TA_Aya": "Aya",
-            "ask_TA_Jiyoon": "Jiyoon",
-            "ask_TA_Amanda": "Amanda"
+    if message in ["ask_TA_Aya", "ask_TA_Jiyoon"]:
+        ta_selected = "Aya" if message == "ask_TA_Aya" else "Jiyoon"
+        # Initialize question_flow state
+        conversation_history[session_id]["question_flow"] = {
+            "ta": ta_selected,
+            "state": "awaiting_question",  # waiting for the student to type the question
+            "raw_question": "",
+            "suggested_question": ""
         }
-        ta_selected = ta_mapping.get(message)
-        conversation_history[session_id]["awaiting_ta_question"] = ta_selected
         return jsonify({
             "text": f"Please type your question for TA {ta_selected}.",
             "session_id": session_id
         })
+    
+    if user in [u.lower() for u in TA_USER_LIST] and message.lower() == "respond":
+            # Process TA response prompt. For example, set flag and prompt for typed response.
+            conversation_history[session_id]["awaiting_ta_response"] = True
+            print(f"DEBUG: Session {session_id} is now awaiting TA response from {user}")
+            return jsonify({"status": "Please type your response to the student.", "session_id": session_id})
+   
+    # Check if we are in the middle of a TA question workflow
+    if conversation_history[session_id].get("question_flow"):
+        q_flow = conversation_history[session_id]["question_flow"]
+        state = q_flow.get("state", "")
+        
+        # State 1: Awaiting the initial question from the student.
+        if state == "awaiting_question":
+            # Save the raw question
+            q_flow["raw_question"] = message
+            # Ask whether to refine or send the question
+            q_flow["state"] = "awaiting_decision"
+            return jsonify({
+                "text": f"You typed: \"{message}\".\nWould you like to **refine** your question or **send** it as is?",
+                "attachments": [
+                    {
+                        "actions": [
+                            {
+                                "type": "button",
+                                "text": "Refine",
+                                "msg": "refine",
+                                "msg_in_chat_window": True,
+                                "msg_processing_type": "sendMessage"
+                            },
+                            {
+                                "type": "button",
+                                "text": "Send",
+                                "msg": "send",
+                                "msg_in_chat_window": True,
+                                "msg_processing_type": "sendMessage"
+                            }
+                        ]
+                    }
+                ],
+                "session_id": session_id
+            })
+        
+    # State 2: Awaiting decision from student on whether to refine or send
+        if state == "awaiting_decision":
+            if message.lower() == "send":
+                q_flow["state"] = "awaiting_final_confirmation"
+                return jsonify({
+                    "text": f"Are you sure you want to send the following question to TA {q_flow['ta']}?\n\n\"{q_flow['raw_question']}\"",
+                    "attachments": [
+                        {
+                            "actions": [
+                                {"type": "button", "text": "Confirm", "msg": "confirm", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                                {"type": "button", "text": "Cancel", "msg": "cancel", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}
+                            ]
+                        }
+                    ],
+                    "session_id": session_id
+                })
+            elif message.lower() == "refine":
+                # Default refine using LLM feedback
+                suggested = generate_suggested_question(q_flow["raw_question"])[0]
+                q_flow["suggested_question"] = suggested
+                q_flow["state"] = "awaiting_refinement_decision"
+                return jsonify({
+                    "text": f"Here is a suggested version of your question:\n\n\"{suggested}\"\n\nDo you **approve** this version, want to **modify**, or do a **Manual Edit**?",
+                    "attachments": [
+                        {
+                            "actions": [
+                                {"type": "button", "text": "Approve", "msg": "approve", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                                {"type": "button", "text": "Modify", "msg": "modify", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                                {"type": "button", "text": "Manual Edit", "msg": "manual_edit", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}
+                            ]
+                        }
+                    ],
+                    "session_id": session_id
+                })
+            else:
+                return jsonify({
+                    "text": "Please choose either **refine** or **send**.",
+                    "session_id": session_id
+                })
+
+        # Handling the decision in the refinement phase:
+        if state == "awaiting_refinement_decision":
+            if message.lower() == "approve":
+                q_flow["state"] = "awaiting_final_confirmation"
+                return jsonify({
+                    "text": f"Do you want to send the following question to TA {q_flow['ta']}?\n\n\"{q_flow['suggested_question']}\"",
+                    "attachments": [
+                        {
+                            "actions": [
+                                {"type": "button", "text": "Confirm", "msg": "confirm", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                                {"type": "button", "text": "Cancel", "msg": "cancel", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}
+                            ]
+                        }
+                    ],
+                    "session_id": session_id
+                })
+            elif message.lower() == "modify":
+                q_flow["state"] = "awaiting_feedback"
+                return jsonify({
+                    "text": "Please type your feedback for refining your question.",
+                    "session_id": session_id
+                })
+            elif message.lower() == "manual_edit":
+                q_flow["state"] = "awaiting_manual_edit"
+                return jsonify({
+                    "text": "Please type your manually edited question.",
+                    "session_id": session_id
+                })
+            else:
+                return jsonify({
+                    "text": "Please choose **approve**, **Modify**, or **Manual Edit**.",
+                    "session_id": session_id
+                })
+
+        # State 3: Awaiting feedback for LLM refinement
+        if state == "awaiting_feedback":
+            feedback = message
+            # Combine the raw question and feedback to generate a refined version.
+            prompt = f"Original question: \"{q_flow['raw_question']}\"\nFeedback: \"{feedback}\"\nGenerate a refined version of the question."
+            new_suggested = generate_response(prompt, session_id)
+            q_flow["suggested_question"] = new_suggested
+            q_flow["state"] = "awaiting_refinement_decision"
+            return jsonify({
+                "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested}\"\n\nDo you **approve**, want to **Modify**, or do a **Manual Edit**?",
+                "attachments": [
+                    {
+                        "actions": [
+                            {"type": "button", "text": "Approve", "msg": "approve", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                            {"type": "button", "text": "Modify", "msg": "modify", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                            {"type": "button", "text": "Manual Edit", "msg": "manual_edit", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}
+                        ]
+                    }
+                ],
+                "session_id": session_id
+            })
+
+        # State 4: Handling manual edit input
+        if state == "awaiting_manual_edit":
+            # Directly store the manually edited question as the suggested/final version.
+            q_flow["suggested_question"] = message
+            q_flow["state"] = "awaiting_refinement_decision"
+            return jsonify({
+                "text": f"Your manually edited question is:\n\n\"{message}\"\n\nDo you **approve**, want to **Modify**, or do another **Manual Edit**?",
+                "attachments": [
+                    {
+                        "actions": [
+                            {"type": "button", "text": "Approve", "msg": "approve", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                            {"type": "button", "text": "Modify", "msg": "modify", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                            {"type": "button", "text": "Manual Edit", "msg": "manual_edit", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}
+                        ]
+                    }
+                ],
+                "session_id": session_id
+            })
+
+        # State 5: Awaiting final confirmation to send the question.
+        if state == "awaiting_final_confirmation":
+            if message.lower() == "confirm":
+                ta_username = "aya.ismail" if q_flow["ta"] == "Aya" else "jiyoon.choi"
+                final_question = q_flow.get("suggested_question") or q_flow.get("raw_question")
+                send_direct_message_to_TA(final_question, user, ta_username)
+                conversation_history[session_id]["question_flow"] = None
+                return jsonify(add_menu_button({
+                    "text": f"Your question has been sent to TA {q_flow['ta']}!",
+                    "session_id": session_id
+                }))
+            elif message.lower() == "cancel":
+                conversation_history[session_id]["question_flow"] = None
+                return jsonify(add_menu_button({
+                    "text": "Your TA question process has been canceled. Let me know if you need anything else.",
+                    "session_id": session_id
+                }))
+            else:
+                return jsonify({
+                    "text": "Please choose **confirm** to send or **cancel** to abort.",
+                    "session_id": session_id
+                })
+        
+    if conversation_history[session_id].get("awaiting_ta_response"):
+        # Assume this message is the TA's typed answer.
+        conversation_history[session_id]["awaiting_ta_response"] = False
+        conversation_history[session_id]["messages"].append(("TA", message))
+        print(f"DEBUG: Received TA reply for session {session_id}: {message}")
+        forward_message_to_student(message, session_id)
+        return jsonify({"status": "TA response forwarded to student.", "session_id": session_id})
+    # ----------------------------
+    # End of TA Question Workflow
+    # ----------------------------
+   
+    # if message == "ask_TA":
+    #     # When the student clicks "Ask TA" from the clarification prompt,
+    #     # set a flag so that a follow-up "yes/no" response is expected.
+    #     conversation_history[session_id]["awaiting_ta_confirmation"] = True
+    #     return jsonify({
+    #         "text": "Would you like to ask your TA for further clarification? Please reply with 'yes' or 'no'.",
+    #         "session_id": session_id,
+    #         "attachments": [
+    #             {
+    #                 "title": "Confirm TA assistance:",
+    #                 "actions": [
+    #                     {
+    #                         "type": "button",
+    #                         "text": "Yes",
+    #                         "msg": "yes",
+    #                         "msg_in_chat_window": True,
+    #                         "msg_processing_type": "sendMessage"
+    #                     },
+    #                     {
+    #                         "type": "button",
+    #                         "text": "No",
+    #                         "msg": "no",
+    #                         "msg_in_chat_window": True,
+    #                         "msg_processing_type": "sendMessage"
+    #                     }
+    #                 ]
+    #             }
+    #         ]
+    #     })
+    
+    # if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
+    #     ta_mapping = {
+    #         "ask_TA_Aya": "Aya",
+    #         "ask_TA_Jiyoon": "Jiyoon",
+    #         "ask_TA_Amanda": "Amanda"
+    #     }
+    #     ta_selected = ta_mapping.get(message)
+    #     conversation_history[session_id]["awaiting_ta_question"] = ta_selected
+    #     return jsonify({
+    #         "text": f"Please type your question for TA {ta_selected}.",
+    #         "session_id": session_id
+    #     })
     
     if message in ["quick_summary"]:
         summary = summarizing_agent(message, session_id)
