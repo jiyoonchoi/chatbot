@@ -131,7 +131,7 @@ def generate_response(system, prompt, session_id):
             "Encourage them to reflect on why that information is relevant and how it connects to the paper's broader goals."
             "Your responses should be grounded solely in the research paper uploaded for this session. "
             "Please keep answers concise unless otherwise specified."
-            "For any questions you added at the end of the response, make sure you preface it with '**Food for thought 🤔 (no-reply)**:'"
+            # "For any questions you added at the end of the response, make sure you preface it with '**Food for thought 🤔 (no-reply)**:'"
         )
 
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
@@ -619,7 +619,7 @@ def answer_factual_question(question, session_id):
         "for autistic users), then provide the exact fact from the TwIPS paper. "
         "Ignore any references or citations to other papers. "
         "If the TwIPS paper doesn't state the fact clearly, say so."
-        "For any questions you added at the end of the response, make sure you preface it with '**Food for thought 🤔 (no-reply)**:'"
+        # "For any questions you added at the end of the response, make sure you preface it with '**Food for thought 🤔 (no-reply)**:'"
     )
 
     prompt = (
@@ -628,7 +628,7 @@ def answer_factual_question(question, session_id):
         "for Autistic Users,\" ignoring any other references or cited works:\n\n"
         f"Question: {question}\n\n"
         "If the paper does not clearly state it, say so."
-        "For any questions you added at the end of the response, make sure you preface it with '**Food for thought 🤔 (no-reply)**:'"
+        # "For any questions you added at the end of the response, make sure you preface it with '**Food for thought 🤔 (no-reply)**:'"
     )
 
     return generate_response(system_prompt, prompt, session_id)
