@@ -969,6 +969,21 @@ def query():
     # End of TA Question Workflow
     # ----------------------------
     
+    if conversation_history[session_id].get("awaiting_ta_confirmation"):
+        if message.lower() in ["yes", "y"]:
+            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
+            # Then start the TA question flow: show TA selection (or directly send if a default TA is used)
+            ta_button_response = build_TA_button()  # reuse your TA button builder
+            ta_button_response["session_id"] = session_id
+            return jsonify(ta_button_response)
+        else:
+            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
+            # Fall back to answering the question using the document context
+            answer = answer_question(message, session_id)
+            conversation_history[session_id]["messages"].append(("bot", answer))
+            # Optionally add a follow-up prompt here
+            return jsonify(add_menu_button({"text": answer, "session_id": session_id}))
+
     if message in ["summarize"]:
         summary = summarizing_agent(message, session_id)
         return jsonify(add_menu_button({"text": summary, "session_id": session_id}))
@@ -1087,6 +1102,34 @@ def query():
             "text": answer_with_prompt,
             "session_id": session_id
         }))
+
+    elif classification == "human_ta_query": 
+        conversation_history[session_id]["awaiting_ta_confirmation"] = True
+        payload = {
+            "text": "It looks like your question may require human TA intervention. Would you like to ask your TA for more clarification?",
+            "attachments": [
+                {
+                    "actions": [
+                        {
+                            "type": "button",
+                            "text": "Yes, Ask TA",
+                            "msg": "yes",
+                            "msg_in_chat_window": True,
+                            "msg_processing_type": "sendMessage"
+                        },
+                        {
+                            "type": "button",
+                            "text": "No, I want to continue",
+                            "msg": "no",
+                            "msg_in_chat_window": True,
+                            "msg_processing_type": "sendMessage"
+                        }
+                    ]
+                }
+            ], 
+            session_id: session_id
+        }
+        return jsonify(payload)
 
     else:
         # Generate the primary answer
