@@ -1008,9 +1008,6 @@ def query():
     # 2) Handle the usual categories (if not a follow-up)
     # ---------------------------------------
     if classification == "greeting":
-        def prepopulate_summaries(session_id):
-            summarizing_agent("summarize", session_id)
-            
         intro_summary = generate_greeting_response(
             "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
             session_id
