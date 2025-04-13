@@ -557,7 +557,12 @@ def forward_message_to_student(ta_response, session_id, student_session_id):
     }
     
     ta = "Aya" if session_id == "session_aya.ismail_twips_research" else "Jiyoon" 
-    message_text = f"Your TA {ta} says: '{ta_response}'"
+    message_text = (
+    f"Your TA {ta} says: '{ta_response}'\n\n"
+    "If you want to continue this conversation, please message your TA "
+    f"{ta} directly in Rocket.Chat or send a private Piazza post here:\n"
+    "https://piazza.com/class/m5wtfh955vwb8/create\n\n"
+    )
     
     student = extract_first_token(student_session_id)
     print(f"DEBUG****: ta session id: {session_id}")
@@ -953,7 +958,8 @@ def query():
             conversation_history[student_session_id]["messages"].append(("TA", message))
             print(f"DEBUG: Received TA reply for session {student_session_id}: {message}")
             forward_message_to_student(message, session_id, student_session_id)
-            return jsonify({"status": "TA response forwarded to student.", "session_id": session_id})
+            response = f"Your response has been forwarded to student {student_username}."
+            return jsonify({"text": response, "session_id": session_id})
     else:
         msg_id = None
    
