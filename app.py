@@ -962,7 +962,8 @@ def query():
             print(data.get("text"))
             conversation_history[student_session_id]["awaiting_ta_response"] = True
             print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
-            return jsonify({"status": "Please type your response to the student.", "session_id": student_session_id})
+
+            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
     
     
     # ----------------------------
