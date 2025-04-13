@@ -546,19 +546,6 @@ def forward_message_to_student(ta_response, session_id):
 # -----------------------------------------------------------------------------
 # Summarization and Question Answering Agents
 # -----------------------------------------------------------------------------
-def generate_intro_summary(session_id):
-    """Generate an introductory summary from the uploaded PDF."""
-    if not ensure_pdf_processed(session_id):
-        return "PDF processing is not complete. Please try again shortly."
-    prompt = (
-        "Based solely on the research paper that was uploaded in this session, "
-        "please provide a one sentence summary of what the paper is about. "
-        "The summary should continue the following sentence with a brief summary "
-        "about the uploaded research paper: "
-        "'I'm here to assist you with understanding this week's reading, which is about...'"
-    )
-    return generate_response("", prompt, session_id)
-
 def summarizing_agent(action_type, session_id):
     """
     Agent to summarize the abstract or the full paper based on the action type.
@@ -1021,21 +1008,19 @@ def query():
     # 2) Handle the usual categories (if not a follow-up)
     # ---------------------------------------
     if classification == "greeting":
-        def prepopulate_summaries(session_id):
-            summarizing_agent("summarize", session_id)
-            
         intro_summary = generate_greeting_response(
             "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
             session_id
         )
         greeting_msg = (
-            "Hello! I am the TA chatbot for CS-150: Generative AI for Social Impact. "
-            "My purpose is to help you critically think about this week's research paper. "
-            "I will guide you through the paper and help you understand its content without "
-            "revealing direct answers to open-ended questions. Please feel free to ask me "
-            "fact-based questions (e.g. 'Who are the authors of the paper?') "
-            + intro_summary + " Please feel free to ask a question about the research paper, "
-            "or explore the menu below for more actions."
+            "## Hello!\n\n"
+            "**I am the TA chatbot for CS-150: Generative AI for Social Impact.**\n\n"
+            "My purpose is to help you critically analyze ONLY week's research paper. I'll guide you "
+            "through the paper to deepen your understanding, but won't directly reveal answers to "
+            "open-ended questions. Instead, I'll encourage you to think critically.\n\n"
+            "Feel free to ask any fact-based questions, such as *\"Who are the authors of the paper?\"*\n\n"
+            f"**{intro_summary}**\n\n"
+            "You can ask a question about the research paper now, or explore the menu below for more actions."
         )
         # Save and return the greeting without any follow-up questions, i.e. no food for thought.
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
