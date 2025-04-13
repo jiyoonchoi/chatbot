@@ -1015,7 +1015,7 @@ def query():
         greeting_msg = (
             "## Hello!\n\n"
             "**I am the TA chatbot for CS-150: Generative AI for Social Impact.**\n\n"
-            "My purpose is to help you critically analyze this week's research paper. I'll guide you "
+            "My purpose is to help you critically analyze ONLY week's research paper. I'll guide you "
             "through the paper to deepen your understanding, but won't directly reveal answers to "
             "open-ended questions. Instead, I'll encourage you to think critically.\n\n"
             "Feel free to ask any fact-based questions, such as *\"Who are the authors of the paper?\"*\n\n"
