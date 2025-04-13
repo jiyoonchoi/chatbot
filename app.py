@@ -31,6 +31,7 @@ summary_abstract_cache = {}
 processed_pdf = {}
 pdf_ready = {}
 conversation_history = {}
+ta_msg_to_student_session = {}
 
 app = Flask(__name__)
 
@@ -513,21 +514,39 @@ def send_direct_message_to_TA(question, session_id, ta_username):
                 "msg_processing_type": "sendMessage"
                 }
             ]
-        }],
-        # Include the student session explicitly
-        "student_session": session_id
+        }]
     }
     try:
         response = requests.post(msg_url, json=payload, headers=headers)
-        print("DEBUG: Direct message sent:", response.json())
+        resp_data = response.json()
+        print("DEBUG: Direct message sent:", resp_data)
+        # Extract the unique message _id returned from Rocket.Chat:
+        if resp_data.get("success") and "message" in resp_data:
+            message_id = resp_data["message"].get("_id")
+            if message_id:
+                # Save the mapping from message id to student session.
+                ta_msg_to_student_session[message_id] = session_id
+                print(f"DEBUG: Mapped message id {message_id} to session {session_id}")
+        # print("DEBUG: Direct message sent:", response.json())
     except Exception as e:
         print("DEBUG: Error sending direct message to TA:", e)
 
 # -----------------------------------------------------------------------------
 # TA-student Messaging Function (forward question to student)
 # -----------------------------------------------------------------------------
+def extract_user(session_id):
+    prefix = "session_"
+    if session_id.startswith(prefix):
+        return session_id[len(prefix):]
+    else:
+        return session_id
+def extract_first_token(session_id):
+    # First, remove the "session_" prefix.
+    user_part = extract_user(session_id)
+    # Then, split and get the first token.
+    return user_part.split('_')[0]
 
-def forward_message_to_student(ta_response, session_id):
+def forward_message_to_student(ta_response, session_id, student_session_id):
     # Build a payload to send to the student.
     
     msg_url = MSG_ENDPOINT
@@ -536,15 +555,16 @@ def forward_message_to_student(ta_response, session_id):
         "X-Auth-Token": BOT_AUTH_TOKEN,
         "X-User-Id": BOT_USER_ID,
     }
-
-    message_text = f"Your TA says: '{ta_response}'"
     
-    print(f"DEBUG: Forwarding message to student {session_id}: {message_text}")
-    if session_id.startswith("session_"):
-        username = session_id[len("session_"):]
+    ta = "Aya" if session_id == "session_aya.ismail_twips_research" else "Jiyoon" 
+    message_text = f"Your TA {ta} says: '{ta_response}'"
+    
+    student = extract_first_token(student_session_id)
+    print(f"DEBUG****: ta session id: {session_id}")
+    print(f"DEBUG: Forwarding message to student {student}: {message_text}")
     
     payload = {
-        "channel": f"@{username}",
+        "channel": f"@{student}",
         "text": message_text
     }
     
@@ -730,12 +750,6 @@ def query():
             "text": f"Please type your question for TA {ta_selected}.",
             "session_id": session_id
         })
-    
-    if user in [u.lower() for u in TA_USER_LIST] and message.lower() == "respond":
-            # Process TA response prompt. For example, set flag and prompt for typed response.
-            conversation_history[session_id]["awaiting_ta_response"] = True
-            print(f"DEBUG: Session {session_id} is now awaiting TA response from {user}")
-            return jsonify({"status": "Please type your response to the student.", "session_id": session_id})
    
     # Check if we are in the middle of a TA question workflow
     if conversation_history[session_id].get("question_flow"):
@@ -920,60 +934,35 @@ def query():
                     "text": "Please choose **confirm** to send or **cancel** to abort.",
                     "session_id": session_id
                 })
-        
-    if conversation_history[session_id].get("awaiting_ta_response"):
+
+    
+    
+    # Look up the student session ID using the mapping.
+
+    msg_id = next(reversed(ta_msg_to_student_session))
+    student_username = ta_msg_to_student_session[msg_id]
+    student_session_id = f"session_{student_username}_twips_research"
+
+    if not student_session_id:
+        return jsonify({"error": "No student session mapped for this message ID."}), 400
+    
+    if message == "respond":
+            # Process TA response prompt. For example, set flag and prompt for typed response.
+            print(data.get("text"))
+            conversation_history[student_session_id]["awaiting_ta_response"] = True
+            print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
+            return jsonify({"status": "Please type your response to the student.", "session_id": student_session_id})
+    
+    if conversation_history[student_session_id].get("awaiting_ta_response"):
         # Assume this message is the TA's typed answer.
-        conversation_history[session_id]["awaiting_ta_response"] = False
-        conversation_history[session_id]["messages"].append(("TA", message))
-        print(f"DEBUG: Received TA reply for session {session_id}: {message}")
-        forward_message_to_student(message, session_id)
+        conversation_history[student_session_id]["awaiting_ta_response"] = False
+        conversation_history[student_session_id]["messages"].append(("TA", message))
+        print(f"DEBUG: Received TA reply for session {student_session_id}: {message}")
+        forward_message_to_student(message, session_id, student_session_id)
         return jsonify({"status": "TA response forwarded to student.", "session_id": session_id})
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
-   
-    # if message == "ask_TA":
-    #     # When the student clicks "Ask TA" from the clarification prompt,
-    #     # set a flag so that a follow-up "yes/no" response is expected.
-    #     conversation_history[session_id]["awaiting_ta_confirmation"] = True
-    #     return jsonify({
-    #         "text": "Would you like to ask your TA for further clarification? Please reply with 'yes' or 'no'.",
-    #         "session_id": session_id,
-    #         "attachments": [
-    #             {
-    #                 "title": "Confirm TA assistance:",
-    #                 "actions": [
-    #                     {
-    #                         "type": "button",
-    #                         "text": "Yes",
-    #                         "msg": "yes",
-    #                         "msg_in_chat_window": True,
-    #                         "msg_processing_type": "sendMessage"
-    #                     },
-    #                     {
-    #                         "type": "button",
-    #                         "text": "No",
-    #                         "msg": "no",
-    #                         "msg_in_chat_window": True,
-    #                         "msg_processing_type": "sendMessage"
-    #                     }
-    #                 ]
-    #             }
-    #         ]
-    #     })
-    
-    # if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
-    #     ta_mapping = {
-    #         "ask_TA_Aya": "Aya",
-    #         "ask_TA_Jiyoon": "Jiyoon",
-    #         "ask_TA_Amanda": "Amanda"
-    #     }
-    #     ta_selected = ta_mapping.get(message)
-    #     conversation_history[session_id]["awaiting_ta_question"] = ta_selected
-    #     return jsonify({
-    #         "text": f"Please type your question for TA {ta_selected}.",
-    #         "session_id": session_id
-    #     })
     
     if message in ["summarize"]:
         summary = summarizing_agent(message, session_id)
