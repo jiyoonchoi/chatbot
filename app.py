@@ -546,19 +546,6 @@ def forward_message_to_student(ta_response, session_id):
 # -----------------------------------------------------------------------------
 # Summarization and Question Answering Agents
 # -----------------------------------------------------------------------------
-def generate_intro_summary(session_id):
-    """Generate an introductory summary from the uploaded PDF."""
-    if not ensure_pdf_processed(session_id):
-        return "PDF processing is not complete. Please try again shortly."
-    prompt = (
-        "Based solely on the research paper that was uploaded in this session, "
-        "please provide a one sentence summary of what the paper is about. "
-        "The summary should continue the following sentence with a brief summary "
-        "about the uploaded research paper: "
-        "'I'm here to assist you with understanding this week's reading, which is about...'"
-    )
-    return generate_response("", prompt, session_id)
-
 def summarizing_agent(action_type, session_id):
     """
     Agent to summarize the abstract or the full paper based on the action type.
