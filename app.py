@@ -1116,13 +1116,6 @@ def query():
                             "msg": "yes",
                             "msg_in_chat_window": True,
                             "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "No, I want to continue",
-                            "msg": "no",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
                         }
                     ]
                 }
