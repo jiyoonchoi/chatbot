@@ -31,6 +31,7 @@ summary_abstract_cache = {}
 processed_pdf = {}
 pdf_ready = {}
 conversation_history = {}
+ta_msg_to_student_session = {}
 
 app = Flask(__name__)
 
@@ -345,29 +346,40 @@ def classify_difficulty_of_question(question, session_id):
     else:
         return "conceptual"
   
-def generate_suggested_question(student_question):
+def generate_suggested_question(student_question, feedback=None):
     """
     Generate a rephrased and clearer version of the student's question.
     """
-    prompt = (
-        f"Based on the following student question, generate a clearer and more concise version that does not reference any PDF content:\n\n"
-        f"Student question: \"{student_question}\"\n\n"
-        "Suggested improved question:"
-    )
+    if feedback:
+        prompt = (
+            f"Original question: \"{student_question}\"\n"
+            f"Feedback: \"{feedback}\"\n"
+            "Generate a refined and more comprehensive version of the question that incorporates the feedback, "
+            "including a reference to the TWIPs paper."
+        )
+    else:
+        prompt = (
+            f"Based on the following student question, generate a more comprehensive question that references the TWIPs paper\n\n"
+            f"Student question: \"{student_question}\"\n\n"
+            "Suggested improved question:"
+        )
+
     response = generate(
-         model='4o-mini',
-         system=(
-             "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-             "Rephrase the student's question to be clearer and more concise without referring to any external context."
-         ),
-         query=prompt,
-         temperature=0.0,
-         lastk=5,
-         session_id="suggestion_session",
-         rag_usage=False,  # RAG disabled
-         rag_threshold=0.3,
-         rag_k=0
+            model='4o-mini',
+            system=(
+                "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
+                "Rephrase or refine the student's question to be clearer and more comprehensive, "
+                "incorporating any provided feedback and referring to the paper where relevant."
+            ),
+            query=prompt,
+            temperature=0.0,
+            lastk=5,
+            session_id="suggestion_session",
+            rag_usage=False,
+            rag_threshold=0.3,
+            rag_k=0
     )
+
     if isinstance(response, dict):
          result = response.get('response', '').strip()
     else:
@@ -502,21 +514,39 @@ def send_direct_message_to_TA(question, session_id, ta_username):
                 "msg_processing_type": "sendMessage"
                 }
             ]
-        }],
-        # Include the student session explicitly
-        "student_session": session_id
+        }]
     }
     try:
         response = requests.post(msg_url, json=payload, headers=headers)
-        print("DEBUG: Direct message sent:", response.json())
+        resp_data = response.json()
+        print("DEBUG: Direct message sent:", resp_data)
+        # Extract the unique message _id returned from Rocket.Chat:
+        if resp_data.get("success") and "message" in resp_data:
+            message_id = resp_data["message"].get("_id")
+            if message_id:
+                # Save the mapping from message id to student session.
+                ta_msg_to_student_session[message_id] = session_id
+                print(f"DEBUG: Mapped message id {message_id} to session {session_id}")
+        # print("DEBUG: Direct message sent:", response.json())
     except Exception as e:
         print("DEBUG: Error sending direct message to TA:", e)
 
 # -----------------------------------------------------------------------------
 # TA-student Messaging Function (forward question to student)
 # -----------------------------------------------------------------------------
+def extract_user(session_id):
+    prefix = "session_"
+    if session_id.startswith(prefix):
+        return session_id[len(prefix):]
+    else:
+        return session_id
+def extract_first_token(session_id):
+    # First, remove the "session_" prefix.
+    user_part = extract_user(session_id)
+    # Then, split and get the first token.
+    return user_part.split('_')[0]
 
-def forward_message_to_student(ta_response, session_id):
+def forward_message_to_student(ta_response, session_id, student_session_id):
     # Build a payload to send to the student.
     
     msg_url = MSG_ENDPOINT
@@ -525,15 +555,21 @@ def forward_message_to_student(ta_response, session_id):
         "X-Auth-Token": BOT_AUTH_TOKEN,
         "X-User-Id": BOT_USER_ID,
     }
-
-    message_text = f"Your TA says: '{ta_response}'"
     
-    print(f"DEBUG: Forwarding message to student {session_id}: {message_text}")
-    if session_id.startswith("session_"):
-        username = session_id[len("session_"):]
+    ta = "Aya" if session_id == "session_aya.ismail_twips_research" else "Jiyoon" 
+    message_text = (
+    f"Your TA {ta} says: '{ta_response}'\n\n"
+    "If you want to continue this conversation, please message your TA "
+    f"{ta} directly in Rocket.Chat or send a private Piazza post here:\n"
+    "https://piazza.com/class/m5wtfh955vwb8/create\n\n"
+    )
+    
+    student = extract_first_token(student_session_id)
+    print(f"DEBUG****: ta session id: {session_id}")
+    print(f"DEBUG: Forwarding message to student {student}: {message_text}")
     
     payload = {
-        "channel": f"@{username}",
+        "channel": f"@{student}",
         "text": message_text
     }
     
@@ -706,12 +742,6 @@ def query():
             "text": f"Please type your question for TA {ta_selected}.",
             "session_id": session_id
         })
-    
-    if user in [u.lower() for u in TA_USER_LIST] and message.lower() == "respond":
-            # Process TA response prompt. For example, set flag and prompt for typed response.
-            conversation_history[session_id]["awaiting_ta_response"] = True
-            print(f"DEBUG: Session {session_id} is now awaiting TA response from {user}")
-            return jsonify({"status": "Please type your response to the student.", "session_id": session_id})
    
     # Check if we are in the middle of a TA question workflow
     if conversation_history[session_id].get("question_flow"):
@@ -837,13 +867,12 @@ def query():
         if state == "awaiting_feedback":
             feedback = message
             # Combine the raw question and feedback to generate a refined version.
-            prompt = f"Original question: \"{q_flow['raw_question']}\"\nFeedback: \"{feedback}\"\nGenerate a refined version of the question."
-            print(f"DEBUG in MODIFY: {session_id} - {prompt}")
-            new_suggested = generate_response("", prompt, session_id)
-            q_flow["suggested_question"] = new_suggested
+            base_question = q_flow.get("suggested_question", q_flow["raw_question"])
+            new_suggested, new_suggested_clean = generate_suggested_question(base_question, feedback)
+            q_flow["suggested_question"] = new_suggested_clean
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
-                "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested}\"\n\nDo you **approve**, want to **Modify**, or do a **Manual Edit**?",
+                "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested_clean}\"\n\nDo you **approve**, want to **Modify**, or do a **Manual Edit**?",
                 "attachments": [
                     {
                         "actions": [
@@ -897,61 +926,59 @@ def query():
                     "text": "Please choose **confirm** to send or **cancel** to abort.",
                     "session_id": session_id
                 })
+
+    
+    
+    # Look up the student session ID using the mapping.
+
+    if ta_msg_to_student_session:
+        msg_id = next(reversed(ta_msg_to_student_session))
+        student_username = ta_msg_to_student_session[msg_id]
+        student_session_id = f"session_{student_username}_twips_research"
+
+        if not student_session_id:
+            return jsonify({"error": "No student session mapped for this message ID."}), 400
         
-    if conversation_history[session_id].get("awaiting_ta_response"):
+        if conversation_history[student_session_id].get("awaiting_ta_response"):
         # Assume this message is the TA's typed answer.
-        conversation_history[session_id]["awaiting_ta_response"] = False
-        conversation_history[session_id]["messages"].append(("TA", message))
-        print(f"DEBUG: Received TA reply for session {session_id}: {message}")
-        forward_message_to_student(message, session_id)
-        return jsonify({"status": "TA response forwarded to student.", "session_id": session_id})
+            conversation_history[student_session_id]["awaiting_ta_response"] = False
+            conversation_history[student_session_id]["messages"].append(("TA", message))
+            print(f"DEBUG: Received TA reply for session {student_session_id}: {message}")
+            forward_message_to_student(message, session_id, student_session_id)
+            response = f"Your response has been forwarded to student {student_username}."
+            return jsonify({"text": response, "session_id": session_id})
+    else:
+        msg_id = None
+   
+    if message == "respond":
+            # Process TA response prompt. For example, set flag and prompt for typed response.
+            print(data.get("text"))
+            conversation_history[student_session_id]["awaiting_ta_response"] = True
+            print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
+
+            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
+    
+    
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
-   
-    # if message == "ask_TA":
-    #     # When the student clicks "Ask TA" from the clarification prompt,
-    #     # set a flag so that a follow-up "yes/no" response is expected.
-    #     conversation_history[session_id]["awaiting_ta_confirmation"] = True
-    #     return jsonify({
-    #         "text": "Would you like to ask your TA for further clarification? Please reply with 'yes' or 'no'.",
-    #         "session_id": session_id,
-    #         "attachments": [
-    #             {
-    #                 "title": "Confirm TA assistance:",
-    #                 "actions": [
-    #                     {
-    #                         "type": "button",
-    #                         "text": "Yes",
-    #                         "msg": "yes",
-    #                         "msg_in_chat_window": True,
-    #                         "msg_processing_type": "sendMessage"
-    #                     },
-    #                     {
-    #                         "type": "button",
-    #                         "text": "No",
-    #                         "msg": "no",
-    #                         "msg_in_chat_window": True,
-    #                         "msg_processing_type": "sendMessage"
-    #                     }
-    #                 ]
-    #             }
-    #         ]
-    #     })
     
-    # if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
-    #     ta_mapping = {
-    #         "ask_TA_Aya": "Aya",
-    #         "ask_TA_Jiyoon": "Jiyoon",
-    #         "ask_TA_Amanda": "Amanda"
-    #     }
-    #     ta_selected = ta_mapping.get(message)
-    #     conversation_history[session_id]["awaiting_ta_question"] = ta_selected
-    #     return jsonify({
-    #         "text": f"Please type your question for TA {ta_selected}.",
-    #         "session_id": session_id
-    #     })
-    
+
+    if conversation_history[session_id].get("awaiting_ta_confirmation"):
+        if message.lower() in ["yes", "y"]:
+            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
+            # Then start the TA question flow: show TA selection (or directly send if a default TA is used)
+            ta_button_response = build_TA_button()  # reuse your TA button builder
+            ta_button_response["session_id"] = session_id
+            return jsonify(ta_button_response)
+        else:
+            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
+            # Fall back to answering the question using the document context
+            answer = answer_question(message, session_id)
+            conversation_history[session_id]["messages"].append(("bot", answer))
+            # Optionally add a follow-up prompt here
+            return jsonify(add_menu_button({"text": answer, "session_id": session_id}))
+
     if message in ["summarize"]:
         summary = summarizing_agent(message, session_id)
         return jsonify(add_menu_button({"text": summary, "session_id": session_id}))
@@ -1067,6 +1094,27 @@ def query():
             "text": answer_with_prompt,
             "session_id": session_id
         }))
+
+    elif classification == "human_ta_query": 
+        conversation_history[session_id]["awaiting_ta_confirmation"] = True
+        payload = {
+            "text": "It looks like your question may require human TA intervention. Would you like to ask your TA for more clarification?",
+            "attachments": [
+                {
+                    "actions": [
+                        {
+                            "type": "button",
+                            "text": "Yes, Ask TA",
+                            "msg": "yes",
+                            "msg_in_chat_window": True,
+                            "msg_processing_type": "sendMessage"
+                        }
+                    ]
+                }
+            ], 
+            session_id: session_id
+        }
+        return jsonify(payload)
 
     else:
         # Generate the primary answer
