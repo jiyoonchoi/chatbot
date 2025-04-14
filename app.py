@@ -1055,13 +1055,13 @@ def query():
             session_id
         )
         greeting_msg = (
-            "Hello! I am the TA chatbot for CS-150: Generative AI for Social Impact. "
-            "My purpose is to help you critically think about this week's research paper. "
-            "I will guide you through the paper and help you understand its content without "
-            "revealing direct answers to open-ended questions. Please feel free to ask me "
-            "fact-based questions (e.g. 'Who are the authors of the paper?') "
-            + intro_summary + " Please feel free to ask a question about the research paper, "
-            "or explore the menu below for more actions."
+            "**Hello! 👋 I am the TA chatbot for CS-150: Generative AI for Social Impact. 🤖**\n\n"
+            "My purpose is to help you critically analyze this ONLY week's research paper. I'll guide you "
+            "through the paper to deepen your understanding, but won't directly reveal answers to "
+            "open-ended questions. 🤫 Instead, I'll encourage you to think critically. 🧠\n\n"
+            "Feel free to ask any fact-based questions, such as *\"Who are the authors of the paper?\"*\n\n"
+            f"**{intro_summary}**\n\n"
+            "Please ask a question about the research paper now, or explore the menu below for more actions."
         )
         # Save and return the greeting without any follow-up questions, i.e. no food for thought.
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
