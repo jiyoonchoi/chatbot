@@ -24,7 +24,7 @@ BOT_USER_ID = os.getenv("botUserId")
 BOT_AUTH_TOKEN = os.getenv("botToken")
 TA_USERNAME = os.getenv("taUserName")
 MSG_ENDPOINT = os.getenv("msgEndPoint")
-TA_USER_LIST = ["aya.ismail", "jiyoon.choi"]
+TA_USER_LIST = ["aya.ismail", "jiyoon.choi", "amanda.wu"]
 
 # Global caches (session-specific)
 summary_abstract_cache = {}
@@ -379,10 +379,11 @@ def generate_suggested_question(student_question):
     print("END OF SUGGESTED QUESTION")
     return result, suggested_question_clean
 
-def build_menu_response():
-    """Return the full interactive menu."""
+def show_button_options(response_text, session_id):
+    """Return the button options."""
     return {
-        "text": "Please feel free to ask a question about the research paper, or explore the menu below for more actions:",
+        "text": response_text,
+        "session_id": session_id,
         "attachments": [
             {
                 "title": "Summarize:",
@@ -411,42 +412,6 @@ def build_menu_response():
         ]
     }
 
-def show_menu(response_text, session_id):
-    return {
-        "text": response_text,
-        "session_id": session_id,
-        "attachments": [
-            {
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Menu",
-                        "msg": "menu",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            }
-        ]
-    }
-
-def add_menu_button(response_payload):
-    """Add a Menu button to the existing response payload."""
-    response_payload["attachments"] = [
-        {
-            "actions": [
-                {
-                    "type": "button",
-                    "text": "Menu",
-                    "msg": "menu",
-                    "msg_in_chat_window": True,
-                    "msg_processing_type": "sendMessage"
-                }
-            ]
-        }
-    ]
-    return response_payload
-
 def build_TA_button():
     """Build TA selection buttons for asking a TA."""
     return {
@@ -466,6 +431,13 @@ def build_TA_button():
                         "type": "button",
                         "text": "Ask TA Jiyoon",
                         "msg": "ask_TA_Jiyoon",
+                        "msg_in_chat_window": True,
+                        "msg_processing_type": "sendMessage"
+                    },
+                    {
+                        "type": "button",
+                        "text": "Ask TA Amanda",
+                        "msg": "ask_TA_Amanda",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
@@ -639,6 +611,7 @@ def answer_conceptual_question(question, session_id):
 # -----------------------------------------------------------------------------
 @app.route('/query', methods=['POST'])
 def query():
+    print("DEBUG: Version 04.21.2025.")
     data = request.get_json() or request.form
     print(f"DEBUG: Received request data: {data}")
     user = data.get("user_name", "Unknown")
@@ -668,15 +641,10 @@ def query():
         summary_abstract_cache.pop(session_id, None)
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
-        return jsonify(add_menu_button({
+        return jsonify(show_button_options({
             "text": "Your conversation history and caches have been cleared.",
             "session_id": session_id
         }))
-    
-    if message == "menu":
-        menu_response = build_menu_response()
-        menu_response["session_id"] = session_id
-        return jsonify(menu_response)
     
      # ----------------------------
     # TA Question Workflow
@@ -693,8 +661,16 @@ def query():
         ta_button_response["session_id"] = session_id
         return jsonify(ta_button_response)
     
-    if message in ["ask_TA_Aya", "ask_TA_Jiyoon"]:
-        ta_selected = "Aya" if message == "ask_TA_Aya" else "Jiyoon"
+    if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
+        # User selected a TA to ask a question.
+        ta_selected = ""
+        if message == "ask_TA_Amanda":
+            ta_selected = "Amanda"
+        elif message == "ask_TA_Jiyoon":
+            ta_selected = "Jiyoon"
+        elif message == "ask_TA_Aya":
+            ta_selected = "Aya"
+            
         # Initialize question_flow state
         conversation_history[session_id]["question_flow"] = {
             "ta": ta_selected,
@@ -718,7 +694,7 @@ def query():
         # If the user types the safeguard exit keyword "exit", cancel the TA flow.
         if message.lower() == "exit":
             conversation_history[session_id]["question_flow"] = None
-            return jsonify(add_menu_button({
+            return jsonify(show_button_options({
                 "text": "Exiting TA query mode. How can I help you with the research paper?",
                 "session_id": session_id
             }))
@@ -878,17 +854,21 @@ def query():
         # State 5: Awaiting final confirmation to send the question.
         if state == "awaiting_final_confirmation":
             if message.lower() == "confirm":
-                ta_username = "aya.ismail" if q_flow["ta"] == "Aya" else "jiyoon.choi"
+                ta_username = ""
+                if q_flow["ta"] == "Amanda":
+                    ta_username = "amanda.wu"
+                elif q_flow["ta"] == "Jiyoon":
+                    ta_username = "jiyoon.choi"
+                elif q_flow["ta"] == "Aya":
+                    ta_username = "aya.ismail"
+
                 final_question = q_flow.get("suggested_question") or q_flow.get("raw_question")
                 send_direct_message_to_TA(final_question, user, ta_username)
                 conversation_history[session_id]["question_flow"] = None
-                return jsonify(add_menu_button({
-                    "text": f"Your question has been sent to TA {q_flow['ta']}!",
-                    "session_id": session_id
-                }))
+                return jsonify(show_button_options(f"Your question has been sent to TA {q_flow['ta']}!", session_id))
             elif message.lower() == "cancel":
                 conversation_history[session_id]["question_flow"] = None
-                return jsonify(add_menu_button({
+                return jsonify(show_button_options({
                     "text": "Your TA question process has been canceled. Let me know if you need anything else.",
                     "session_id": session_id
                 }))
@@ -908,53 +888,10 @@ def query():
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
-   
-    # if message == "ask_TA":
-    #     # When the student clicks "Ask TA" from the clarification prompt,
-    #     # set a flag so that a follow-up "yes/no" response is expected.
-    #     conversation_history[session_id]["awaiting_ta_confirmation"] = True
-    #     return jsonify({
-    #         "text": "Would you like to ask your TA for further clarification? Please reply with 'yes' or 'no'.",
-    #         "session_id": session_id,
-    #         "attachments": [
-    #             {
-    #                 "title": "Confirm TA assistance:",
-    #                 "actions": [
-    #                     {
-    #                         "type": "button",
-    #                         "text": "Yes",
-    #                         "msg": "yes",
-    #                         "msg_in_chat_window": True,
-    #                         "msg_processing_type": "sendMessage"
-    #                     },
-    #                     {
-    #                         "type": "button",
-    #                         "text": "No",
-    #                         "msg": "no",
-    #                         "msg_in_chat_window": True,
-    #                         "msg_processing_type": "sendMessage"
-    #                     }
-    #                 ]
-    #             }
-    #         ]
-    #     })
-    
-    # if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
-    #     ta_mapping = {
-    #         "ask_TA_Aya": "Aya",
-    #         "ask_TA_Jiyoon": "Jiyoon",
-    #         "ask_TA_Amanda": "Amanda"
-    #     }
-    #     ta_selected = ta_mapping.get(message)
-    #     conversation_history[session_id]["awaiting_ta_question"] = ta_selected
-    #     return jsonify({
-    #         "text": f"Please type your question for TA {ta_selected}.",
-    #         "session_id": session_id
-    #     })
-    
+  
     if message in ["summarize"]:
         summary = summarizing_agent(message, session_id)
-        return jsonify(add_menu_button({"text": summary, "session_id": session_id}))
+        return jsonify(show_button_options(summary, session_id))
     
     # Process general chatbot queries
     conversation_history[session_id]["messages"].append(("user", message))
@@ -969,7 +906,7 @@ def query():
         conversation_history[session_id]["awaiting_followup_response"] = False
         decline_text = "No problem! Let me know if you have any other questions."
         conversation_history[session_id]["messages"].append(("bot", decline_text))
-        return jsonify(add_menu_button({
+        return jsonify(show_button_options({
             "text": decline_text,
             "session_id": session_id
         }))
@@ -992,7 +929,7 @@ def query():
         # 3) IMPORTANT: Mark that we've handled the follow-up, so we don't loop
         conversation_history[session_id]["awaiting_followup_response"] = False
         
-        return jsonify(add_menu_button({
+        return jsonify(show_button_options({
             "text": f"{answer}\n\n{continue_text}",
             "session_id": session_id
         }))
@@ -1014,16 +951,16 @@ def query():
         )
         greeting_msg = (
             "**Hello! 👋 I am the TA chatbot for CS-150: Generative AI for Social Impact. 🤖**\n\n"
-            "My purpose is to help you critically analyze this ONLY week's research paper. I'll guide you "
+            "My purpose is to help you critically analyze ONLY this week's research paper. I'll guide you "
             "through the paper to deepen your understanding, but won't directly reveal answers to "
             "open-ended questions. 🤫 Instead, I'll encourage you to think critically. 🧠\n\n"
             "Feel free to ask any fact-based questions, such as *\"Who are the authors of the paper?\"*\n\n"
             f"**{intro_summary}**\n\n"
-            "Please ask a question about the research paper now, or explore the menu below for more actions."
+            "Please ask a question about the research paper now, click 'Summarize', or ask your real TA anything I'm not able to answer. "
         )
         # Save and return the greeting without any follow-up questions, i.e. no food for thought.
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
-        interactive_payload = show_menu(greeting_msg, session_id)
+        interactive_payload = show_button_options(greeting_msg, session_id)
         return jsonify(interactive_payload)
     
     if classification == "content_answerable":
@@ -1046,7 +983,7 @@ def query():
         else:
             answer_with_prompt = answer
 
-        return jsonify(add_menu_button({
+        return jsonify(show_button_options({
             "text": answer_with_prompt,
             "session_id": session_id
         }))
@@ -1063,7 +1000,7 @@ def query():
         else:
             answer_with_prompt = answer
 
-        return jsonify(add_menu_button({
+        return jsonify(show_button_options({
             "text": answer_with_prompt,
             "session_id": session_id
         }))
@@ -1086,7 +1023,7 @@ def query():
             "text": answer_with_prompt,
             "session_id": session_id
         }
-        return jsonify(add_menu_button(payload))
+        return jsonify(show_button_options(payload))
 
 # -----------------------------------------------------------------------------
 # Error Handling and App Runner
