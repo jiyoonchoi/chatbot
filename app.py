@@ -160,12 +160,6 @@ def generate_greeting_response(prompt, session_id):
     Generate a greeting response without any follow-up question.
     This function uses a system prompt that omits any instruction to ask follow-up questions.
     """
-    # system_prompt = (
-    #     "As a TA chatbot for CS-150: Generative AI for Social Impact, "
-    #     "your job is to help the student think critically about the research paper. "
-    #     "Provide a concise answer based solely on the research paper that was uploaded in this session. "
-    #     "Do not include any follow-up questions in your response."
-    # )
     system_prompt = (
     "As a TA chatbot for CS-150: Generative AI for Social Impact, your goal is to support students in understanding the research paper through critical thinking. "
     "Provide a brief, general overview to orient them, but avoid summarizing too much. "
@@ -183,7 +177,7 @@ def generate_greeting_response(prompt, session_id):
         lastk=5,
         session_id=session_id,
         rag_usage=True,
-        rag_threshold=0.3,
+        rag_threshold=0.1,
         rag_k=5
     )
     if isinstance(response, dict):
@@ -591,7 +585,7 @@ def generate_intro_summary(session_id):
         "please provide a one sentence summary of what the paper is about. "
         "The summary should continue the following sentence with a brief summary "
         "about the uploaded research paper: "
-        "'I'm here to assist you with understanding this week's reading, which is about...'"
+        "'This week's paper discusses...'"
     )
     return generate_response("", prompt, session_id)
 
@@ -1047,22 +1041,24 @@ def query():
     # 2) Handle the usual categories (if not a follow-up)
     # ---------------------------------------
     if classification == "greeting":
-        def prepopulate_summaries(session_id):
-            summarizing_agent("summarize", session_id)
-            
-        intro_summary = generate_greeting_response(
-            "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
-            session_id
-        )
+        
+        print(f"DEBUG: Greeting for {session_id}; processed={processed_pdf.get(session_id)}, ready={pdf_ready.get(session_id)}")
+        ensure_pdf_processed(session_id)
+        print(f"DEBUG: Greeting for {session_id}; processed={processed_pdf.get(session_id)}, ready={pdf_ready.get(session_id)}")
+        intro_summary = generate_intro_summary(session_id)
+
+       
         greeting_msg = (
-            "**Hello! 👋 I am the TA chatbot for CS-150: Generative AI for Social Impact. 🤖**\n\n"
-            "My purpose is to help you critically analyze this ONLY week's research paper. I'll guide you "
-            "through the paper to deepen your understanding, but won't directly reveal answers to "
-            "open-ended questions. 🤫 Instead, I'll encourage you to think critically. 🧠\n\n"
-            "Feel free to ask any fact-based questions, such as *\"Who are the authors of the paper?\"*\n\n"
-            f"**{intro_summary}**\n\n"
-            "Please ask a question about the research paper now, or explore the menu below for more actions."
-        )
+        "**Hello! 👋 I am the TA chatbot for CS-150: Generative AI for Social Impact. 🤖**\n\n"
+        "I'm here to help you *critically analyze ONLY this week's* research paper. "
+        "I'll guide you to the key sections and ask thought-provoking questions—but I won't just hand you the answers. 🤫🧠\n\n"
+        "You have two buttons to choose from:\n"
+        "- **Quick Summary** - Get a concise 3-4 sentence overview of the paper's main objectives and findings.\n"
+        "- **Ask TA** - Send your question to a human TA if you'd like extra help.\n\n"
+        f"**{intro_summary}**\n\n"
+        "If there's a question I can't fully answer, I'll prompt you to forward it to your TA. "
+        "Please ask a question about the paper now or click one of the buttons below!")
+        
         # Save and return the greeting without any follow-up questions, i.e. no food for thought.
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
         interactive_payload = show_menu(greeting_msg, session_id)
