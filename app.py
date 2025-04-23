@@ -129,6 +129,7 @@ def generate_response(system, prompt, session_id):
             "Your responses should be grounded solely in the research paper uploaded for this session. "
             "Please keep answers concise unless otherwise specified."
             "Bold with surrounding '**' to any follow up questions so they are easily visible to the user."
+            "Add appropriate emojis to the response to make it more engaging like a question mark emoji when asking a followup question."
         )
 
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
@@ -964,8 +965,7 @@ def query():
             # Combine the raw question and feedback to generate a refined version.
             base_question = q_flow.get("suggested_question", q_flow["raw_question"])
             new_suggested, new_suggested_clean = generate_suggested_question(session_id, base_question, feedback)
-            clean = new_suggested_clean.strip().strip('"').strip()
-            q_flow["suggested_question"] = clean
+            q_flow["suggested_question"] = new_suggested_clean
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
                 "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested_clean}\"\n\nDo you **approve**, want to **Modify**, do a **Manual Edit**, or **cancel**?",
