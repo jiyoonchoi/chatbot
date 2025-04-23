@@ -788,10 +788,8 @@ def query():
         summary_abstract_cache.pop(session_id, None)
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
-        return jsonify(show_main_buttons({
-            "text": "Your conversation history and caches have been cleared.",
-            "session_id": session_id
-        }))
+        return jsonify(show_main_buttons("Your conversation history and caches have been cleared.", session_id
+        ))
     
     # if message == "menu":
     #     menu_response = build_menu_response()
@@ -870,10 +868,10 @@ def query():
         # If the user types the safeguard exit keyword "exit", cancel the TA flow.
         if message.lower() == "exit":
             conversation_history[session_id]["question_flow"] = None
-            return jsonify(show_main_buttons({
-                "text": "Exiting TA query mode. How can I help you with the research paper?",
-                "session_id": session_id
-            }))
+            return jsonify(show_main_buttons(
+                "Exiting TA query mode. How can I help you with the research paper?",
+                session_id
+            ))
         
         q_flow = conversation_history[session_id]["question_flow"]
         state = q_flow.get("state", "")
@@ -1111,7 +1109,7 @@ def query():
             answer = answer_question(message, session_id)
             conversation_history[session_id]["messages"].append(("bot", answer))
             # Optionally add a follow-up prompt here
-            return jsonify(show_main_buttons({"text": answer, "session_id": session_id}))
+            return jsonify(show_main_buttons(answer, session_id))
 
     if message in ["summarize"]:
         summary = summarizing_agent(message, session_id)
