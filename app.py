@@ -666,7 +666,7 @@ def query():
     data = request.get_json() or request.form
     print(f"DEBUG: Received request data: {data}")
     print("DEBUG: keys:", data.keys())
-    print("DEBUG: channel_id =", data.get("channel_id"), " rid =", data.get("rid"))
+    print("DEBUG: channel_id =", data.get("channel_id"), " rid =", data.get("channel_id"))
 
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
