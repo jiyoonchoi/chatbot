@@ -340,21 +340,32 @@ def classify_difficulty_of_question(question, session_id):
     else:
         return "conceptual"
   
-def generate_suggested_question(student_question, feedback=None):
+def generate_suggested_question(session_id, student_question, feedback=None):
     """
     Generate a rephrased and clearer version of the student's question.
     """
+    print(f"DEBUG: session_id inside generate_suggested_question: {session_id}")
+    ta_name = conversation_history[session_id]["question_flow"]["ta"]
     if feedback:
         prompt = (
-            f"Original question: \"{student_question}\"\n"
-            f"Feedback: \"{feedback}\"\n"
-            "Generate a refined and more comprehensive version of the question that incorporates the feedback, "
-            "including a reference to the TWIPs paper."
+            f"""Original question: \"{student_question}\"\n"""
+            f"""Feedback: \"{feedback}\"\n"""
+            f"""Based on the following session id {session_id} which has the name of the student and the paper 
+            \n\n they are reading, generate a refined and more comprehensive version of the question that incorporates the feedback, "
+            "including a reference to the paper and an intro with the name of the student (something like "Hi {ta_name}! This is [first name of student]). 
+            Add any relevant context that the TA might need to understand the question.
+            Add the name of the TA based on the selected TA {ta_name}.\n\n
+            Do not add details that might seem not relevant or that make the question too long\n\n"""
         )
     else:
         prompt = (
-            f"Based on the following student question, generate a more comprehensive question that references the TWIPs paper\n\n"
-            f"Student question: \"{student_question}\"\n\n"
+            f"""Based on the following student question and the following session id {session_id} which has the name of the student and the paper 
+            \n\n they are reading, generate a refined and more comprehensive version of the student question\n\n"""
+            f"""Remember that the TA does not have context to the conversation, so be sure to include a reference to the paper and an intro with the name of the student (something like "Hi {ta_name}! This is [first name of student]).
+            Add any relevant context that the TA might need to understand the question\n\n
+            Do not add details that might seem not relevant or that make the question too long\n\n
+            Add the name of the TA based on the selected TA {ta_name}.\n\n"""
+            f""""Student question: \"{student_question}\"\n\n"""
             "Suggested improved question:"
         )
 
@@ -812,7 +823,7 @@ def query():
                 })
             elif message.lower() == "refine":
                 # Default refine using LLM feedback
-                suggested = generate_suggested_question(q_flow["raw_question"])[0]
+                suggested = generate_suggested_question(session_id, q_flow["raw_question"])[0]
                 q_flow["suggested_question"] = suggested
                 q_flow["state"] = "awaiting_refinement_decision"
                 return jsonify({
@@ -875,7 +886,7 @@ def query():
             feedback = message
             # Combine the raw question and feedback to generate a refined version.
             base_question = q_flow.get("suggested_question", q_flow["raw_question"])
-            new_suggested, new_suggested_clean = generate_suggested_question(base_question, feedback)
+            new_suggested, new_suggested_clean = generate_suggested_question(session_id, base_question, feedback)
             q_flow["suggested_question"] = new_suggested_clean
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
