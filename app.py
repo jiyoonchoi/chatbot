@@ -1223,10 +1223,8 @@ def query():
         else:
             answer_with_prompt = answer
 
-        return jsonify(add_menu_button({
-            "text": answer_with_prompt,
-            "session_id": session_id
-        }))
+        return jsonify(show_main_buttons(answer_with_prompt, session_id
+        ))
 
     elif classification == "human_ta_query": 
         conversation_history[session_id]["awaiting_ta_confirmation"] = True
