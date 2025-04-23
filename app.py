@@ -43,24 +43,56 @@ def get_session_id(data):
     user = data.get("user_name", "unknown_user").strip().lower()
     return f"session_{user}_twips_research"
 
-def send_typing(room_id, is_typing=True):
-    """Tell Rocket.Chat to show (or hide) the ‘Bot is typing…’ indicator."""
-    url = f"{ROCKET_CHAT_URL}/api/v1/chat.sendTyping"
+# add this at top‐level
+loading_message_ids: dict[str, str] = {}
+
+def send_typing(room_id: str, is_typing: bool = True):
+    """
+    Instead of native typing (unsupported via REST),
+    we post a temporary "🔄 Loading..." message and then delete it.
+    """
     headers = {
         "X-Auth-Token": BOT_AUTH_TOKEN,
         "X-User-Id":   BOT_USER_ID,
         "Content-Type":"application/json"
     }
-    
-    payload = {"rid": room_id, "isTyping": is_typing}
-    print("DEBUG sendTyping URL →", url)
 
+    if is_typing:
+        # 1) Post a loading message
+        post_url = f"{ROCKET_CHAT_URL}/api/v1/chat.postMessage"
+        payload = {
+            "channel": room_id,
+            "text":    "🔄 Loading…"
+        }
+        try:
+            resp = requests.post(post_url, json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+            # store the new message ID so we can delete it later
+            msg_id = data["message"]["_id"]
+            loading_message_ids[room_id] = msg_id
+            print(f"DEBUG sendTyping → posted loading msg {msg_id} in {room_id}")
+        except Exception as e:
+            print("DEBUG sendTyping (post) failed:", e)
 
-    try:
-        resp = requests.post(url, json=payload, headers=headers)
-        print(f"DEBUG sendTyping → status={resp.status_code}, body={resp.text}")    
-    except Exception as e:
-        print("DEBUG: send_typing failed:", e)
+    else:
+        # 2) Delete the previously posted loading message
+        msg_id = loading_message_ids.pop(room_id, None)
+        if not msg_id:
+            print(f"DEBUG sendTyping → no loading msg to delete for {room_id}")
+            return
+
+        delete_url = f"{ROCKET_CHAT_URL}/api/v1/chat.delete"
+        payload = {
+            "roomId": room_id,
+            "msgId":  msg_id
+        }
+        try:
+            resp = requests.post(delete_url, json=payload, headers=headers)
+            resp.raise_for_status()
+            print(f"DEBUG sendTyping → deleted loading msg {msg_id} in {room_id}")
+        except Exception as e:
+            print("DEBUG sendTyping (delete) failed:", e)
 
 # -----------------------------------------------------------------------------
 # PDF Handling Functions
