@@ -52,6 +52,11 @@ def send_typing(room_id, is_typing=True):
         "Content-Type":"application/json"
     }
     payload = {"rid": room_id, "isTyping": is_typing}
+    
+    resp = requests.post(url, json=payload, headers=headers)
+    print(f"DEBUG sendTyping → status={resp.status_code}, body={resp.text}")
+
+
     try:
         requests.post(url, json=payload, headers=headers)
     except Exception as e:
