@@ -436,7 +436,6 @@ def show_main_buttons(response_text, session_id):
         "session_id": session_id,
         "attachments": [
             {
-                "title": "Summarize:",
                 "actions": [
                     {
                         "type": "button",
@@ -448,7 +447,6 @@ def show_main_buttons(response_text, session_id):
                 ]
             },
             {
-                "title": "Do you have a question for your TA?",
                 "actions": [
                     {
                         "type": "button",
