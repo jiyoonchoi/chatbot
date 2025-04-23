@@ -123,7 +123,8 @@ def generate_response(system, prompt, session_id):
             "Rather than giving direct answers, encourage students to think critically. "
             "If the question is requesting for a summary of the paper, please provide a summary of the paper. Otherwise,"
             "Do NOT directly answer questions with specific numbers, names, or results. "
-            "Instead, guide students toward where they can find the information in the paper (e.g., introduction, methods section, results, discussion). "
+            "Instead, guide students toward where they can find the information in the paper (e.g., introduction, methods section, results, discussion)"
+            "and give them a teaser about an interesting aspect of that section. "
             "Do not summarize the entire answer; instead, promote thoughtful engagement with the content. "
             "Encourage them to reflect on why that information is relevant and how it connects to the paper's broader goals."
             "Your responses should be grounded solely in the research paper uploaded for this session. "
@@ -966,7 +967,6 @@ def query():
     conversation_history[session_id]["messages"].append(("user", message))
     classification = classify_query(message, session_id)
     print(f"DEBUG: User query classified as: {classification}")
-
 
     # -------------------------------------------
     # 1) Handle the new follow-up categories first
