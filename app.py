@@ -43,6 +43,20 @@ def get_session_id(data):
     user = data.get("user_name", "unknown_user").strip().lower()
     return f"session_{user}_twips_research"
 
+def send_typing(room_id, is_typing=True):
+    """Tell Rocket.Chat to show (or hide) the ‘Bot is typing…’ indicator."""
+    url = f"{ROCKET_CHAT_URL}/api/v1/chat.sendTyping"
+    headers = {
+        "X-Auth-Token": BOT_AUTH_TOKEN,
+        "X-User-Id":   BOT_USER_ID,
+        "Content-Type":"application/json"
+    }
+    payload = {"roomId": room_id, "isTyping": is_typing}
+    try:
+        requests.post(url, json=payload, headers=headers)
+    except Exception as e:
+        print("DEBUG: send_typing failed:", e)
+
 # -----------------------------------------------------------------------------
 # PDF Handling Functions
 # -----------------------------------------------------------------------------
@@ -651,6 +665,7 @@ def query():
     print("DEBUG: Version 04.21.2025.")
     data = request.get_json() or request.form
     print(f"DEBUG: Received request data: {data}")
+    print("DEBUG: payload keys:", data.keys())
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
     
