@@ -418,7 +418,7 @@ def build_menu_response():
                 "actions": [
                     {
                         "type": "button",
-                        "text": "🧑‍🏫 Ask a TA",
+                        "text": "👩‍🏫Ask a TA",
                         "msg": "ask_TA",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
@@ -563,7 +563,7 @@ def build_refinement_buttons(q_flow):
             "text":"📝 Manual Edit",
             "msg": base,
             "msg_in_chat_window": True,
-            "msg_processing_type": "sendMessage"
+            "msg_processing_type": "respondWithMessage"
           },
           {"type":"button","text":"❌ Cancel","msg":"cancel","msg_in_chat_window":True,"msg_processing_type":"sendMessage"}
         ]
@@ -907,6 +907,7 @@ def query():
                 return jsonify({
                     "text": f"Here is a suggested version of your question:\n\n\"{suggested}\"\n\nDo you **approve** this version, want to **modify**, do a **Manual Edit**, or **cancel**?",
                     "session_id": session_id, 
+                    **build_refinement_buttons(q_flow)
                     
                 })
             else:
