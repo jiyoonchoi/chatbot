@@ -665,15 +665,19 @@ def query():
     print("DEBUG: Version 04.21.2025.")
     data = request.get_json() or request.form
     print(f"DEBUG: Received request data: {data}")
-    print("DEBUG: payload keys:", data.keys())
+    # print("DEBUG: payload keys:", data.keys())
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
+    room_id = data.get("channel_id")
     
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
     
     print(f"Message from {user}: {message}")
     session_id = get_session_id(data)
+    
+    if room_id:
+        send_typing(room_id, True)
     
     # Initialize conversation state if new session
     if session_id not in conversation_history:
@@ -1129,6 +1133,10 @@ def query():
             "text": answer_with_prompt,
             "session_id": session_id
         }
+        
+        if room_id:
+            send_typing(room_id, False)
+
         return jsonify(show_button_options(payload))
 
 # -----------------------------------------------------------------------------
