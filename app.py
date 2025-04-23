@@ -937,7 +937,6 @@ def query():
                 })
             elif message.lower() == "manual_edit":
                 q_flow["state"] = "awaiting_manual_edit"
-                q_flow["state"] = "awaiting_manual_edit"
                 return jsonify({
                     "text": (
                     "📝 **Manual edit mode**\n\n"
@@ -965,7 +964,8 @@ def query():
             # Combine the raw question and feedback to generate a refined version.
             base_question = q_flow.get("suggested_question", q_flow["raw_question"])
             new_suggested, new_suggested_clean = generate_suggested_question(session_id, base_question, feedback)
-            q_flow["suggested_question"] = new_suggested_clean
+            clean = new_suggested_clean.strip().strip('"').strip()
+            q_flow["suggested_question"] = clean
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
                 "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested_clean}\"\n\nDo you **approve**, want to **Modify**, do a **Manual Edit**, or **cancel**?",
