@@ -570,7 +570,27 @@ def build_refinement_buttons(q_flow):
         ]
       }]
     }
-
+def build_manual_edit_buttons(prefill_text):
+    return {
+      "attachments": [{
+        "actions": [
+          {
+            "type": "button",
+            "text": "✏️ Edit…",
+            "msg": prefill_text,
+            "msg_in_chat_window": True,
+            "msg_processing_type": "respondWithMessage"
+          },
+          {
+            "type": "button",
+            "text": "📤 Send",
+            "msg": prefill_text,
+            "msg_in_chat_window": True,
+            "msg_processing_type": "sendMessage"
+          }
+        ]
+      }]
+    }
 def forward_message_to_student(ta_response, session_id, student_session_id):
     # Build a payload to send to the student.
     
@@ -618,7 +638,9 @@ def generate_intro_summary(session_id):
         "about the uploaded research paper: "
         "'This week's paper discusses...'"
     )
-    return generate_response("", prompt, session_id)
+    raw = generate_response("", prompt, session_id)
+    clean = raw.strip().strip('"').strip("'").strip('*')
+    return clean
 
 def summarizing_agent(action_type, session_id):
     """
@@ -937,15 +959,25 @@ def query():
                     "session_id": session_id
                 })
             elif message.lower() == "manual_edit":
-                q_flow["state"] = "awaiting_manual_edit"
+                # q_flow["state"] = "awaiting_manual_edit"
+                # return jsonify({
+                #     "text": (
+                #     "📝 **Manual edit mode**\n\n"
+                #     "Here’s the current suggestion:\n\n"
+                #     f"> {q_flow['suggested_question']}\n\n"
+                #     "Please edit that text however you like, then just send it back."
+                #     ),
+                #     "session_id": session_id
+                # })
+                q_flow["state"] = "awaiting_refinement_decision"
+                clean = q_flow["suggested_question"]
                 return jsonify({
-                    "text": (
-                    "📝 **Manual edit mode**\n\n"
-                    "Here’s the current suggestion:\n\n"
-                    f"> {q_flow['suggested_question']}\n\n"
-                    "Please edit that text however you like, then just send it back."
-                    ),
-                    "session_id": session_id
+                "text": (
+                    "✏️ I've loaded your edit above. You can tweak it, then either "
+                    "click **📤 Send** or press Enter. After that, click **Approve** to forward to your TA."
+                ),
+                "session_id": session_id,
+                **build_manual_edit_buttons(clean)
                 })
             elif message.lower() == "cancel":
                 conversation_history[session_id]["question_flow"] = None
@@ -1123,6 +1155,7 @@ def query():
         ensure_pdf_processed(session_id)
         print(f"DEBUG: Greeting for {session_id}; processed={processed_pdf.get(session_id)}, ready={pdf_ready.get(session_id)}")
         intro_summary = generate_intro_summary(session_id)
+
 
        
         greeting_msg = (
