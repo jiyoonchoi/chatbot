@@ -51,7 +51,7 @@ def send_typing(room_id, is_typing=True):
         "X-User-Id":   BOT_USER_ID,
         "Content-Type":"application/json"
     }
-    payload = {"roomId": room_id, "isTyping": is_typing}
+    payload = {"rid": room_id, "isTyping": is_typing}
     try:
         requests.post(url, json=payload, headers=headers)
     except Exception as e:
