@@ -967,6 +967,7 @@ def query():
     classification = classify_query(message, session_id)
     print(f"DEBUG: User query classified as: {classification}")
 
+
     # -------------------------------------------
     # 1) Handle the new follow-up categories first
     # -------------------------------------------
