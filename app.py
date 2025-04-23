@@ -665,8 +665,7 @@ def query():
     print("DEBUG: Version 04.21.2025.")
     data = request.get_json() or request.form
     print(f"DEBUG: Received request data: {data}")
-    # print("DEBUG: payload keys:", data.keys())
-    print("DEBUG: webhook keys:", data.keys())
+    print("DEBUG: keys:", data.keys())
     print("DEBUG: channel_id =", data.get("channel_id"), " rid =", data.get("rid"))
 
     user = data.get("user_name", "Unknown")
@@ -931,7 +930,6 @@ def query():
                 })
 
     
-    
     # Look up the student session ID using the mapping.
 
     if ta_msg_to_student_session:
@@ -979,7 +977,8 @@ def query():
             answer = answer_question(message, session_id)
             conversation_history[session_id]["messages"].append(("bot", answer))
             # Optionally add a follow-up prompt here
-            return jsonify(add_menu_button({"text": answer, "session_id": session_id}))
+            # return jsonify(add_menu_button({"text": answer, "session_id": session_id}))
+            return jsonify(show_button_options(summary, session_id))
 
     if message in ["summarize"]:
         summary = summarizing_agent(message, session_id)
