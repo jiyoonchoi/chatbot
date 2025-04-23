@@ -51,14 +51,14 @@ def send_typing(room_id, is_typing=True):
         "X-User-Id":   BOT_USER_ID,
         "Content-Type":"application/json"
     }
-    payload = {"rid": room_id, "isTyping": is_typing}
     
-    resp = requests.post(url, json=payload, headers=headers)
-    print(f"DEBUG sendTyping → status={resp.status_code}, body={resp.text}")
+    payload = {"rid": room_id, "isTyping": is_typing}
+    print("DEBUG sendTyping URL →", url)
 
 
     try:
-        requests.post(url, json=payload, headers=headers)
+        resp = requests.post(url, json=payload, headers=headers)
+        print(f"DEBUG sendTyping → status={resp.status_code}, body={resp.text}")    
     except Exception as e:
         print("DEBUG: send_typing failed:", e)
 
