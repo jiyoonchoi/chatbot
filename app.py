@@ -666,6 +666,9 @@ def query():
     data = request.get_json() or request.form
     print(f"DEBUG: Received request data: {data}")
     # print("DEBUG: payload keys:", data.keys())
+    print("DEBUG: webhook keys:", data.keys())
+    print("DEBUG: channel_id =", data.get("channel_id"), " rid =", data.get("rid"))
+
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
     room_id = data.get("channel_id")
