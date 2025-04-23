@@ -43,8 +43,7 @@ def get_session_id(data):
     user = data.get("user_name", "unknown_user").strip().lower()
     return f"session_{user}_twips_research"
 
-# add this at top‐level
-loading_message_ids: dict[str, str] = {}
+loading_message_ids = {}
 
 def send_typing(room_id: str, is_typing: bool = True):
     """
