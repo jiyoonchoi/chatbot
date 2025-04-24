@@ -1442,21 +1442,60 @@ def query():
 
         # greetings
         if classification == "greeting":
-            intro = generate_greeting_response(
-                "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary.", 
+            intro_summary = generate_greeting_response(
+                "Based solely on the research paper that was uploaded in this session, please provide a one sentence summary of what the paper is about.",
                 session_id
             )
-            greeting_msg = f"**Hello!**\n\n{intro}"
-            return jsonify(show_button_options(greeting_msg, session_id))
+            greeting_msg = (
+                "**Hello! 👋 I am the TA chatbot for CS-150: Generative AI for Social Impact. 🤖**\n\n"
+                "My purpose is to help you critically analyze ONLY this week's research paper. I'll guide you "
+                "through the paper to deepen your understanding, but won't directly reveal answers to "
+                "open-ended questions. 🤫 Instead, I'll encourage you to think critically. 🧠\n\n"
+                "Feel free to ask any fact-based questions, such as *\"Who are the authors of the paper?\"*\n\n"
+                f"**{intro_summary}**\n\n"
+                "Please ask a question about the research paper now, click 'Summarize', or ask your real TA anything I'm not able to answer. "
+            )
+            # Save and return the greeting without any follow-up questions, i.e. no food for thought.
+            conversation_history[session_id]["messages"].append(("bot", greeting_msg))
+            interactive_payload = show_button_options(greeting_msg, session_id)
+            return jsonify(interactive_payload)
 
         # answerable
         if classification == "content_answerable":
             diff = classify_difficulty_of_question(message, session_id)
             if diff == "factual":
-                ans = answer_factual_question(message, session_id)
+                answer = answer_factual_question(message, session_id)
+                conversation_history[session_id]["messages"].append(("bot", answer))
+
+                # Optionally generate a follow-up question (like you do for normal answers)
+                universal_followup = generate_follow_up(session_id)
+                if universal_followup:
+                    conversation_history[session_id]["awaiting_followup_response"] = True
+                    conversation_history[session_id]["messages"].append(("bot", universal_followup))
+                    answer_with_prompt = f"{answer}\n\n{universal_followup}"
+                else:
+                    answer_with_prompt = answer
+
+                return jsonify(show_button_options({
+                    "text": answer_with_prompt,
+                    "session_id": session_id
+                }))
             else:
-                ans = answer_conceptual_question(message, session_id)
-            return jsonify(show_button_options(ans, session_id))
+                answer = answer_conceptual_question(message, session_id)
+                conversation_history[session_id]["messages"].append(("bot", answer))
+
+                universal_followup = generate_follow_up(session_id)
+                if universal_followup:
+                    conversation_history[session_id]["awaiting_followup_response"] = True
+                    conversation_history[session_id]["messages"].append(("bot", universal_followup))
+                    answer_with_prompt = f"{answer}\n\n{universal_followup}"
+                else:
+                    answer_with_prompt = answer
+
+                return jsonify(show_button_options({
+                    "text": answer_with_prompt,
+                    "session_id": session_id
+                }))
 
         # human TA query
         if classification == "human_ta_query":
