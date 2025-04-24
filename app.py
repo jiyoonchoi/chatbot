@@ -517,6 +517,10 @@ def send_direct_message_to_TA(question, session_id, ta_username):
     Send a direct message to the TA using Rocket.Chat.
     """
     msg_url = MSG_ENDPOINT
+    
+    print("DEBUG: BOT_USER_ID =", BOT_USER_ID)
+    print("DEBUG: BOT_AUTH_TOKEN =", BOT_AUTH_TOKEN and BOT_AUTH_TOKEN[:5] + "…")
+    
     headers = {
         "Content-Type": "application/json",
         "X-Auth-Token": BOT_AUTH_TOKEN,
