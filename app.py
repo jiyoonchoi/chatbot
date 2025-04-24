@@ -1400,9 +1400,44 @@ def query():
         print(f"DEBUG: classified as {classification}")
 
         # handle followups
-        if classification in ["followup_decline", "followup_continue", "new_topic"]:
-            # similar to before...
-            # (omitted for brevity; just paste your existing followup code here)
+        if classification == "followup_decline":
+            # The user is declining further discussion of the follow-up topic
+            conversation_history[session_id]["awaiting_followup_response"] = False
+            decline_text = "No problem! Let me know if you have any other questions."
+            conversation_history[session_id]["messages"].append(("bot", decline_text))
+            return jsonify(show_button_options({
+                "text": decline_text,
+                "session_id": session_id
+            }))
+
+        elif classification == "followup_continue":
+            # The user wants to keep talking about the same topic.
+            # Instead of just prompting "Could you tell me more specifically what you'd like to clarify?"
+            # we can do something more productive.
+            
+            # 1) Provide an actual content-based answer, using answer_question
+            # (assuming the user is repeating their interest in "features and functionalities")
+            answer = answer_question(message, session_id)
+            conversation_history[session_id]["messages"].append(("bot", answer))
+            
+            # 2) Optionally generate another follow-up or ask if they'd like more details
+            # but let's keep it simple so we don't loop forever
+            continue_text = "Let me know if you'd like more details or if you have a different question."
+            conversation_history[session_id]["messages"].append(("bot", continue_text))
+            
+            # 3) IMPORTANT: Mark that we've handled the follow-up, so we don't loop
+            conversation_history[session_id]["awaiting_followup_response"] = False
+            
+            return jsonify(show_button_options({
+                "text": f"{answer}\n\n{continue_text}",
+                "session_id": session_id
+            }))
+
+        elif classification == "new_topic":
+            # The user is pivoting away from the old follow-up
+            conversation_history[session_id]["awaiting_followup_response"] = False
+            # We now proceed to check if the new message also requires an answer from the PDF
+            # For simplicity, let's let the normal flow continue below
             pass
 
         # greetings
