@@ -45,11 +45,11 @@ def get_session_id(data):
 
 loading_message_ids = {}
 
+
 def send_typing(room_id: str, is_typing: bool = True):
-    """
-    Instead of native typing (unsupported via REST),
-    we post a temporary "🔄 Loading..." message and then delete it.
-    """
+    print("DEBUG: BOT_USER_ID =", BOT_USER_ID)
+    print("DEBUG: BOT_AUTH_TOKEN =", BOT_AUTH_TOKEN and BOT_AUTH_TOKEN[:5] + "…")
+
     headers = {
         "X-Auth-Token": BOT_AUTH_TOKEN,
         "X-User-Id":   BOT_USER_ID,
