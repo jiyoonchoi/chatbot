@@ -977,6 +977,28 @@ def query():
                     "text": "Please type your feedback for refining your question.",
                     "session_id": session_id
                 })
+            # *************
+            elif state == "awaiting_manual_input":
+                # Save what the user typed
+                q_flow["suggested_question"] = message
+                q_flow["state"] = "awaiting_refinement_decision"
+
+                return jsonify({
+                    "text": f"Your manually edited question is:\n\n\"{message}\"\n\n"
+                            "Do you **Approve**, want to **Modify**, or do another **Manual Edit**?",
+                    "attachments": [
+                        {
+                            "actions": [
+                                {"type": "button", "text": "✅ Approve", "msg": "approve", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                                {"type": "button", "text": "✏️ Modify", "msg": "modify", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                                {"type": "button", "text": "📝 Manual Edit", "msg": "manual_edit", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                                {"type": "button", "text": "❌ Cancel", "msg": "cancel", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
+                            ]
+                        }
+                    ],
+                    "session_id": session_id
+                })
+            # *************
             elif message.lower() == "manual_edit":
                 # q_flow["state"] = "awaiting_manual_edit"
                 # return jsonify({
