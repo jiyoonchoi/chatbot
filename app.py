@@ -899,10 +899,11 @@ def query():
             q_flow["suggested_question"] = new_suggested_clean
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
-                "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested_clean}\"\n\nDo you **approve**, want to **Modify**, do a **Manual Edit**, or **cancel**?",
-                "session_id": session_id, 
-                **build_refinement_buttons(q_flow)
-
+                "text": f"Here is a suggested version of your question:\n\n\"{suggested}\"\n\nDo you **approve** this version, want to **modify**, do a **Manual Edit**, or **cancel**?",
+                "session_id": session_id,
+                "attachments": build_refinement_buttons(q_flow)["attachments"]
+            })
+        
         # State 4: Handling manual edit input
         if state == "awaiting_manual_edit":
             # Directly store the manually edited question as the suggested/final version.
@@ -1081,8 +1082,7 @@ def query():
             answer_with_prompt = f"{answer}\n\n{universal_followup}"
         else:
             answer_with_prompt = answer
-        return jsonify(show_button_buttons(answer_with_prompt, session_id
-        ))
+        return jsonify(show_button_options(answer_with_prompt, session_id))
 
     elif classification == "human_ta_query": 
         conversation_history[session_id]["awaiting_ta_confirmation"] = True
