@@ -112,24 +112,13 @@ def ensure_pdf_processed(session_id):
 # LLM Generation Functions
 # -----------------------------------------------------------------------------
 def generate_response(system, prompt, session_id):
-    """
-    Generate a response based on the prompt using a fixed system prompt.
-    """
-
     if not system:
         system = (
             "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
-            "Your role is to guide students in developing their own understanding of the research paper. "
-            "Rather than giving direct answers, encourage students to think critically. "
-            "If the question is requesting for a summary of the paper, please provide a summary of the paper. Otherwise,"
-            "Do NOT directly answer questions with specific numbers, names, or results. "
-            "Instead, guide students toward where they can find the information in the paper (e.g., introduction, methods section, results, discussion). "
-            "Do not summarize the entire answer; instead, promote thoughtful engagement with the content. "
-            "Encourage them to reflect on why that information is relevant and how it connects to the paper's broader goals."
-            "Your responses should be grounded solely in the research paper uploaded for this session. "
-            "Please keep answers concise unless otherwise specified."
-            "Bold with surrounding '**' to any follow up questions so they are easily visible to the user."
-            "Add appropriate emojis to the response to make it more engaging like a question mark emoji when asking a followup question."
+            "ONLY answer the question based on the uploaded research paper. "
+            "DO NOT create follow-up questions, prompts, or emojis. "
+            "Keep answers short and direct. "
+            "Encourage the student to explore the paper sections themselves if needed."
         )
 
     print(f"DEBUG: Sending prompt for session {session_id}: {prompt}")
@@ -190,28 +179,35 @@ def generate_greeting_response(prompt, session_id):
 
 def generate_follow_up(session_id):
     """
-    Dynamically generate a follow-up question that:
-      - references the conversation context
-      - invites the user to specify what they want to explore further
+    Generate a clear, single follow-up question related to the last bot response.
     """
     messages = conversation_history.get(session_id, {}).get("messages", [])
     if not messages:
-        return ""
+        return None  # no convo yet
 
-    # Build a textual summary of the conversation so far.
-    context = "\n".join([f"{speaker}: {msg}" for speaker, msg in messages])
+    # ONLY take the last bot message to generate the followup
+    last_bot_message = None
+    for speaker, msg in reversed(messages):
+        if speaker == "bot":
+            last_bot_message = msg
+            break
+    
+    if not last_bot_message:
+        return None  # no bot message found
 
     prompt = (
-        "Based on the conversation so far, craft a single follow-up prompt that invites the user "
-        "to elaborate or clarify what they want to explore further in the paper. If the conversation "
-        "does not logically require a follow-up, return an empty string.\n\n"
-        "Conversation:\n" + context
+        f"Based on the following response you just gave to a student:\n\n"
+        f"\"{last_bot_message}\"\n\n"
+        "Write a single, clear follow-up question that invites deeper reflection about this response. "
+        "It should naturally extend from the specific information in the answer. "
+        "Keep it short and engaging. "
+        "Return ONLY the follow-up question itself."
     )
-   
+
     system_prompt = (
-        "You are a TA chatbot that encourages students to think more deeply about the research paper. "
-        "Craft a follow-up question that helps the student examine aspects such as the paper’s assumptions, evidence, methodology, or implications. "
-        "Avoid answering for them—instead, prompt them to explore further."
+        "You are a TA chatbot promoting critical thinking. "
+        "Generate a single follow-up question based ONLY on the last bot response, "
+        "encouraging the student to reflect further."
     )
 
     response = generate(
@@ -221,18 +217,21 @@ def generate_follow_up(session_id):
         temperature=0.0,
         lastk=5,
         session_id=f"{session_id}_followup",
-        rag_usage=True,
+        rag_usage=False,
         rag_threshold=0.3,
         rag_k=5
     )
 
     if isinstance(response, dict):
-        result = "🧐" + response.get("response", "").strip()
+        followup = response.get("response", "").strip()
     else:
-        result = response.strip()
+        followup = response.strip()
 
-    # Optionally, you could decide to return "" if the LLM suggests a question not relevant or empty.
-    return result
+    if not followup:
+        return None
+    
+    return followup
+
 
 def classify_query(message, session_id):
     """
@@ -257,65 +256,45 @@ def classify_query(message, session_id):
 
     # Check if we're expecting a follow-up response
     if conversation_history[session_id].get("awaiting_followup_response"):
-        # If so, we instruct the LLM to classify among an expanded set of labels.
         prompt = f"""
-                    We are in the middle of a conversation about a research paper, and I (the TA chatbot)
-                    recently asked a follow-up question. The conversation so far is:
-                    ---
-                    {conversation_text}
-                    ---
-                    The user just said: "{message}"
+        We are in the middle of a conversation about a research paper...
+        {conversation_text}
+        ---
+        The user just said: "{message}"
 
-                    Please classify the user's message into EXACTLY ONE of these categories:
+        Classify into:
+        1) "followup_decline"
+        2) "followup_continue"
+        3) "new_topic"
+        4) "greeting"
+        5) "content_answerable"
+        6) "human_ta_query"
+        """
 
-                    1) "followup_decline": The user wants to skip or end this follow-up topic.
-                    2) "followup_continue": The user is still on the same follow-up topic, clarifying or asking more.
-                    3) "new_topic": The user is shifting to a completely different topic.
-                    4) "greeting": The user is just greeting ("hello", "hi", "hey", etc.).
-                    5) "content_answerable": The user's question can be answered by the PDF content.
-                    6) "human_ta_query": The user is asking about deadlines, scheduling, or other info not in the PDF.
+        classification = generate_response("", prompt, session_id).lower().strip()
 
-                    Return only the label. No extra text.
-                """
-
-        classification_response = generate_response("", prompt, session_id).lower().strip()
-
-        # Match to known labels or default to content_answerable if unrecognized
-        if "followup_decline" in classification_response:
-            return "followup_decline"
-        elif "followup_continue" in classification_response:
-            return "followup_continue"
-        elif "new_topic" in classification_response:
-            return "new_topic"
-        elif "greeting" in classification_response:
+        if classification in ["followup_decline", "followup_continue", "new_topic"]:
+            return classification
+        elif "greeting" in classification:
             return "greeting"
-        elif "content_answerable" in classification_response:
+        elif "content_answerable" in classification:
             return "content_answerable"
-        elif "human_ta_query" in classification_response:
+        elif "human_ta_query" in classification:
             return "human_ta_query"
         else:
             return "content_answerable"
 
-    # ----------------------------------------------------------------------
-    # If we're NOT awaiting a follow-up, we do original classification
-    # ----------------------------------------------------------------------
+    # Otherwise, normal non-followup classification
     prompt = (
-        "Classify the following query into one of these categories: 'greeting', "
-        "'content_answerable', or 'human_TA_query'. "
-        "If the query is a greeting, answer with 'greeting'. "
-        "If the query can be answered solely based on the uploaded research paper, "
-        "answer with 'content_answerable'. "
-        "If the query involves deadlines, scheduling, or requires additional human judgment, "
-        "answer with 'human_TA_query'.\n\n"
+        "Classify into 'greeting', 'content_answerable', or 'human_TA_query'..."
         f"Query: \"{message}\""
     )
     classification = generate_response("", prompt, session_id).lower().strip()
 
     if classification in ["greeting", "content_answerable", "human_ta_query"]:
         return classification
-
-    # Default if unrecognized
     return "content_answerable"
+
 
 def classify_difficulty_of_question(question, session_id):
     """
@@ -395,35 +374,53 @@ def generate_suggested_question(session_id, student_question, feedback=None):
     return result, suggested_question_clean
 
 
-def show_button_options(response_text, session_id):
-    """Return the button options."""
+def show_button_options(response_text, session_id, include_quick_summary_button=False, include_followup_button=False):
+    """Return the button options. Can optionally include Quick Summary and Follow-up buttons."""
+    attachments = []
+
+    if include_quick_summary_button:
+        attachments.append({
+            "actions": [
+                {
+                    "type": "button",
+                    "text": "📄 Quick Summary",
+                    "msg": "summarize",
+                    "msg_in_chat_window": True,
+                    "msg_processing_type": "sendMessage"
+                }
+            ]
+        })
+
+    if include_followup_button:
+        attachments.append({
+            "actions": [
+                {
+                    "type": "button",
+                    "text": "🎲 Generate Follow-up Question",
+                    "msg": "generate_followup",
+                    "msg_in_chat_window": True,
+                    "msg_processing_type": "sendMessage"
+                }
+            ]
+        })
+
+    # Always show Ask TA button
+    attachments.append({
+        "actions": [
+            {
+                "type": "button",
+                "text": "👩‍🏫 Ask a TA",
+                "msg": "ask_TA",
+                "msg_in_chat_window": True,
+                "msg_processing_type": "sendMessage"
+            }
+        ]
+    })
+
     return {
         "text": response_text,
         "session_id": session_id,
-        "attachments": [
-            {
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "📄 Quick Summary",
-                        "msg": "summarize",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    },
-                ]
-            },
-            {
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "👩‍🏫 Ask a TA",
-                        "msg": "ask_TA",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            }
-        ]
+        "attachments": attachments
     }
 
 
@@ -671,7 +668,6 @@ def answer_factual_question(question, session_id):
         "for Autistic Users,\" ignoring any other references or cited works:\n\n"
         f"Question: {question}\n\n"
         "If the paper does not clearly state it, say so."
-        "Bold with surrounding '**' to any follow up questions so they are easily visible to the user."
     )
 
     return generate_response(system_prompt, prompt, session_id)
@@ -700,7 +696,7 @@ def answer_conceptual_question(question, session_id):
 # -----------------------------------------------------------------------------
 @app.route('/query', methods=['POST'])
 def query():
-    print("DEBUG: Version 04.21.2025.")
+    print("DEBUG: Version 04.27.2025.")
     data = request.get_json() or request.form
     print(f"DEBUG: Received request data: {data}")
     user = data.get("user_name", "Unknown")
@@ -733,6 +729,36 @@ def query():
 
         return jsonify(show_button_options("Your conversation history and caches have been cleared.", session_id))
     
+    # Follow up
+    if message == "generate_followup":
+        followup = generate_follow_up(session_id)
+        conversation_history[session_id]["awaiting_followup_response"] = True
+
+        if followup:
+            return jsonify({
+                "text": f"🧐 **Follow-up Question:**\n\n{followup}\n\nPlease type your answer below! 📩",
+                "session_id": session_id,
+                "attachments": [
+                    {
+                        "actions": [
+                            {
+                                "type": "button",
+                                "text": "❌ Skip Follow-up",
+                                "msg": "skip_followup",
+                                "msg_in_chat_window": True,
+                                "msg_processing_type": "sendMessage"
+                            }
+                        ]
+                    }
+                ]
+            })
+        else:
+            return jsonify(show_button_options(
+                "No follow-up question is available right now. You can continue exploring the paper! 📚",
+                session_id,
+                include_followup_button=True
+            ))
+
      # ----------------------------
     # TA Question Workflow
     # ----------------------------
@@ -979,6 +1005,11 @@ def query():
     classification = classify_query(message, session_id)
     print(f"DEBUG: User query classified as: {classification}")
 
+    # Reset awaiting_followup_response only if NOT in Ask TA workflow
+    if conversation_history[session_id].get("question_flow") is None:
+        if conversation_history[session_id].get("awaiting_followup_response"):
+            conversation_history[session_id]["awaiting_followup_response"] = False
+
     # -------------------------------------------
     # 1) Handle the new follow-up categories first
     # -------------------------------------------
@@ -1032,7 +1063,7 @@ def query():
 
         greeting_msg = (
         "**Hello! 👋 I am the TA chatbot for CS-150: Generative AI for Social Impact. 🤖**\n\n"
-        "I'm here to help you *critically analyze ONLY this week's* research paper. "
+        "I'm here to help you *critically analyze ONLY this week's* research paper, which I *encourage you to read* before interacting with me. "
         "I'll guide you to the key sections and ask thought-provoking questions—but I won't just hand you the answers. 🤫🧠\n\n"
         "You have two buttons to choose from:\n"
         "- 📄 **Quick Summary** - Get a concise 3-4 sentence overview of the paper's main objectives and findings.\n"
@@ -1043,7 +1074,7 @@ def query():
         
         # Save and return the greeting without any follow-up questions, i.e. no food for thought.
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
-        interactive_payload = show_button_options(greeting_msg, session_id)
+        interactive_payload = show_button_options(greeting_msg, session_id, include_quick_summary_button=True)
  
         return jsonify(interactive_payload)
     
@@ -1057,32 +1088,12 @@ def query():
     if classification == "content_factual":
         answer = answer_factual_question(message, session_id)
         conversation_history[session_id]["messages"].append(("bot", answer))
-
-        # Optionally generate a follow-up question (like you do for normal answers)
-        universal_followup = generate_follow_up(session_id)
-        if universal_followup:
-            conversation_history[session_id]["awaiting_followup_response"] = True
-            conversation_history[session_id]["messages"].append(("bot", universal_followup))
-            answer_with_prompt = f"{answer}\n\n{universal_followup}"
-        else:
-            answer_with_prompt = answer
-
-        return jsonify(show_button_options(answer_with_prompt, session_id
-        ))
-
+        return jsonify(show_button_options(answer, session_id, include_followup_button=True))
 
     elif classification == "content_conceptual":
         answer = answer_conceptual_question(message, session_id)
         conversation_history[session_id]["messages"].append(("bot", answer))
-
-        universal_followup = generate_follow_up(session_id)
-        if universal_followup:
-            conversation_history[session_id]["awaiting_followup_response"] = True
-            conversation_history[session_id]["messages"].append(("bot", universal_followup))
-            answer_with_prompt = f"{answer}\n\n{universal_followup}"
-        else:
-            answer_with_prompt = answer
-        return jsonify(show_button_options(answer_with_prompt, session_id))
+        return jsonify(show_button_options(answer, session_id, include_followup_button=True))
 
     elif classification == "human_ta_query": 
         conversation_history[session_id]["awaiting_ta_confirmation"] = True
@@ -1108,17 +1119,8 @@ def query():
         # Generate the primary answer
         answer = answer_question(message, session_id)
         conversation_history[session_id]["messages"].append(("bot", answer))
-        
-        # Dynamically generate an open-ended follow-up based on the conversation.
-        universal_followup = generate_follow_up(session_id)
-        if universal_followup:
-            conversation_history[session_id]["awaiting_followup_response"] = True
-            conversation_history[session_id]["messages"].append(("bot", universal_followup))
-            answer_with_prompt = f"{answer}\n\n{universal_followup}"
-        else:
-            answer_with_prompt = answer
        
-        return jsonify(show_button_options(answer_with_prompt, session_id))
+        return jsonify(show_button_options(answer, session_id))
 
 # -----------------------------------------------------------------------------
 # Error Handling and App Runner
