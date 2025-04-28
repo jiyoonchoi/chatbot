@@ -488,8 +488,7 @@ def query():
             return jsonify(show_buttons("❓ Please click Yes or No.", session_id))
 
     cmds = {"summarize", "generate_followup", "clear_history"}
-    if (conversation_history[session_id].get("awaiting_followup_response")
-            and message.lower() not in cmds):
+    if conversation_history[session_id].get("awaiting_followup_response") and message.lower() not in cmds:
         conversation_history[session_id]["awaiting_followup_response"] = False
         last_followup = conversation_history[session_id].pop("last_followup_question", "")
 
@@ -508,6 +507,7 @@ def query():
             "- If the student provides a vague or open-ended answer, gently correct them and guide them where to look in the paper.\n\n"
         )
 
+        # only after clearing flags, generate feedback
         feedback = generate_response("", grading_prompt, session_id)
         conversation_history[session_id]["messages"].append(("bot", feedback))
 
