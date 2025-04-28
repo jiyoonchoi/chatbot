@@ -437,36 +437,6 @@ def query():
         conversation_history[session_id]["messages"].append(("bot", text))
         return jsonify(show_buttons(text, session_id))
 
-    if message == "ask_TA":
-        conversation_history[session_id]["awaiting_ta_question"] = False
-        conversation_history[session_id].pop("student_question", None)
-        conversation_history[session_id].pop("suggested_question", None)
-        conversation_history[session_id].pop("final_question", None)
-
-        ta_button_response = build_TA_button()
-        ta_button_response["session_id"] = session_id
-        return jsonify(ta_button_response)
-
-    if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
-        ta_selected = ""
-        if message == "ask_TA_Amanda":
-            ta_selected = "Amanda"
-        elif message == "ask_TA_Jiyoon":
-            ta_selected = "Jiyoon"
-        elif message == "ask_TA_Aya":
-            ta_selected = "Aya"
-
-        conversation_history[session_id]["question_flow"] = {
-            "ta": ta_selected,
-            "state": "awaiting_question",
-            "raw_question": "",
-            "suggested_question": ""
-        }
-        return jsonify({
-            "text": f"✅ Please type your question for TA {ta_selected}.",
-            "session_id": session_id
-        })
-
     if session_id not in conversation_history:
         conversation_history[session_id] = {"messages": []}
         summary_cache.pop(session_id, None)
@@ -576,8 +546,7 @@ def query():
     # ----------------------------
 
     if message == "ask_TA": 
-
-        conversation_history[session_id]["awaiting_ta_question"] = False
+        conversation_history[session_id]["awaiting_ta_question"] = True
         conversation_history[session_id].pop("student_question", None)
         conversation_history[session_id].pop("suggested_question", None)
         conversation_history[session_id].pop("final_question", None)
