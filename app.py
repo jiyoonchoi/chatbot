@@ -785,12 +785,12 @@ def query():
             "**Hello! 👋 I am the TA chatbot for CS-150: Generative AI for Social Impact. 🤖**\n\n"
             "I'm here to help you *critically analyze ONLY this week's* research paper, which I *encourage you to read* before interacting with me. "
             "I'll guide you to the key sections and ask thought-provoking questions—but I won't just hand you the answers. 🤫\n\n"
-            "You have two buttons to choose from:\n"
-            "- 📄 **Quick Summary** - Get a concise 3-4 sentence overview of the paper's main objectives and findings.\n"
-            "- 🧑‍🏫 **Ask TA** - Send your question to a human TA if you'd like extra help.\n\n"
             f"**{intro}**\n\n"
             "If there's a question I can't fully answer, I'll prompt you to forward it to your TA. "
             "Please ask a question about the paper now or click one of the buttons below!"
+            "You have two buttons to choose from:\n"
+            "- 📄 **Quick Summary** - Get a concise 3-4 sentence overview of the paper's main objectives and findings.\n"
+            "- 🧑‍🏫 **Ask TA** - Send your question to a human TA if you'd like extra help.\n\n"
         )
 
         conversation_history[session_id]["messages"].append(("bot", greeting_msg))
