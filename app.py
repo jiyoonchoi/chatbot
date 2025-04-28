@@ -185,28 +185,24 @@ def query():
     if conversation_history[session_id].get("awaiting_ta_confirmation"):
         if message.lower() in ["yes", "y"]:
             conversation_history[session_id]["awaiting_ta_confirmation"] = False
-            # Show TA selection
-            ta_buttons = {
-                "text": "Select a TA to ask your question:",
-                "attachments": [{
-                    "actions": [
-                        {"type": "button", "text": "Ask TA Aya", "msg": "ask_TA_Aya", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
-                        {"type": "button", "text": "Ask TA Jiyoon", "msg": "ask_TA_Jiyoon", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}
-                    ]
-                }],
-                "session_id": session_id
+            conversation_history[session_id]["question_flow"] = {
+                "state": "awaiting_question",
+                "ta": None,  # you can fill this if you allow choosing a TA
+                "raw_question": "",
+                "suggested_question": ""
             }
-            return jsonify(ta_buttons)
+            return jsonify({
+                "text": "✅ Great! Please type your question for the TA.",
+                "session_id": session_id
+            })
+
         elif message.lower() in ["no", "n"]:
             conversation_history[session_id]["awaiting_ta_confirmation"] = False
-            # Just say "Ok, let's keep exploring"
-            reply = "✅ No problem! Let's continue exploring the paper. Ask me anything about it!"
-            conversation_history[session_id]["messages"].append(("bot", reply))
-            return jsonify(show_buttons(reply, session_id))
+            text = "✅ No problem! Let's keep exploring the paper."
+            conversation_history[session_id]["messages"].append(("bot", text))
+            return jsonify(show_buttons(text, session_id))
         else:
-            # User typed something else — gently reprompt
-            reprompt = "❓ Please click **Yes** or **No** to continue."
-            return jsonify(show_buttons(reprompt, session_id))
+            return jsonify(show_buttons("❓ Please click Yes or No.", session_id))
 
     if conversation_history[session_id].get("awaiting_followup_response"):
         conversation_history[session_id]["awaiting_followup_response"] = False
@@ -258,6 +254,21 @@ def query():
                 "text": f"🧐 Follow-up:\n\n{followup}\n\nPlease reply with your thoughts!",
                 "session_id": session_id,
                 "attachments": [{"actions": [{"type": "button", "text": "❌ Skip", "msg": "skip_followup", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}]}]
+            })
+        
+    if conversation_history[session_id].get("question_flow"):
+        q_flow = conversation_history[session_id]["question_flow"]
+        if q_flow.get("state") == "awaiting_question":
+            q_flow["raw_question"] = message
+            q_flow["state"] = "ready_to_send"
+            return jsonify({
+                "text": f"📩 You wrote: \"{message}\".\n\nDo you want to send it as-is, refine it, or cancel?",
+                "session_id": session_id,
+                "attachments": [
+                    {"actions": [{"text": "✅ Send", "msg": "send_ta", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}]},
+                    {"actions": [{"text": "✏️ Refine", "msg": "refine_ta", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}]},
+                    {"actions": [{"text": "❌ Cancel", "msg": "cancel_ta", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}]}
+                ]
             })
 
     # Process normal message
@@ -327,10 +338,22 @@ def query():
         conversation_history[session_id]["messages"].append(("bot", answer))
         return jsonify(show_buttons(answer, session_id, followup_button=True))
 
-    if classification == "human_ta_query":
+    if classification == "class_logistics":
+        # Step 1: Try to give a short chatbot answer first
+        short_answer = generate_response(
+            "", 
+            f"You are a TA chatbot for CS-150. The student asked: \"{message}\". "
+            "Give a short, friendly, 1-2 sentence general tip, but do not make up specific class policies. "
+            "If unsure, encourage them to ask the human TA for details.", 
+            session_id
+        )
+        conversation_history[session_id]["messages"].append(("bot", short_answer))
+
+        # Step 2: THEN offer human TA help
         conversation_history[session_id]["awaiting_ta_confirmation"] = True
+
         return jsonify({
-            "text": "It looks like your question may require human TA intervention. Would you like to ask your TA for more clarification? 🧐",
+            "text": f"{short_answer}\n\nWould you like to ask your TA for more clarification? 🧐",
             "attachments": [{
                 "actions": [
                     {
