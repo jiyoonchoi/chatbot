@@ -487,6 +487,39 @@ def query():
         else:
             return jsonify(show_buttons("❓ Please click Yes or No.", session_id))
 
+    # Special admin commands
+    if message.lower() == "clear_history":
+        conversation_history.pop(session_id, None)
+        summary_cache.pop(session_id, None)
+        processed_pdf.pop(session_id, None)
+        pdf_ready.pop(session_id, None)
+        return jsonify(show_buttons("✅ History and caches cleared.", session_id))
+
+    if message.lower() == "summarize":
+        if not ensure_pdf_processed(session_id):
+            return jsonify(show_buttons("PDF not processed yet. Please try again shortly.", session_id))
+        summary = generate_response("", "Summarize the uploaded paper in 3-4 sentences.", session_id)
+        summary_cache[session_id] = summary
+        return jsonify(show_buttons(summary, session_id))
+
+
+    # ----------------------------
+    # Follow-up Question Workflow
+    # ----------------------------
+    
+    # follow up
+    if message.lower() == "generate_followup":
+        followup = generate_followup(session_id)
+        if followup:
+            conversation_history[session_id]["awaiting_followup_response"] = True
+            conversation_history[session_id]["last_followup_question"] = followup
+            conversation_history[session_id]["messages"].append(("bot", followup))
+            return jsonify({
+                "text": f"🧐 Follow-up:\n\n{followup}\n\nPlease reply with your thoughts!",
+                "session_id": session_id,
+                "attachments": [{"actions": [{"type": "button", "text": "❌ Skip", "msg": "skip_followup", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}]}]
+            })
+
     cmds = {"summarize", "generate_followup", "clear_history"}
 
     if conversation_history[session_id].get("awaiting_followup_response") and message.lower() not in cmds:
@@ -516,33 +549,6 @@ def query():
 
         return jsonify(show_buttons(feedback, session_id, followup_button=True))
 
-    # Special admin commands
-    if message.lower() == "clear_history":
-        conversation_history.pop(session_id, None)
-        summary_cache.pop(session_id, None)
-        processed_pdf.pop(session_id, None)
-        pdf_ready.pop(session_id, None)
-        return jsonify(show_buttons("✅ History and caches cleared.", session_id))
-
-    if message.lower() == "summarize":
-        if not ensure_pdf_processed(session_id):
-            return jsonify(show_buttons("PDF not processed yet. Please try again shortly.", session_id))
-        summary = generate_response("", "Summarize the uploaded paper in 3-4 sentences.", session_id)
-        summary_cache[session_id] = summary
-        return jsonify(show_buttons(summary, session_id))
-
-    # follow up
-    if message.lower() == "generate_followup":
-        followup = generate_followup(session_id)
-        if followup:
-            conversation_history[session_id]["awaiting_followup_response"] = True
-            conversation_history[session_id]["last_followup_question"] = followup
-            conversation_history[session_id]["messages"].append(("bot", followup))
-            return jsonify({
-                "text": f"🧐 Follow-up:\n\n{followup}\n\nPlease reply with your thoughts!",
-                "session_id": session_id,
-                "attachments": [{"actions": [{"type": "button", "text": "❌ Skip", "msg": "skip_followup", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}]}]
-            })
         
     # ----------------------------
     # TA Question Workflow
