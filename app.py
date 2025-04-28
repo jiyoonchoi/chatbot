@@ -555,7 +555,6 @@ def query():
     # ----------------------------
 
     if message == "ask_TA": 
-        conversation_history[session_id]["awaiting_ta_question"] = True
         conversation_history[session_id].pop("student_question", None)
         conversation_history[session_id].pop("suggested_question", None)
         conversation_history[session_id].pop("final_question", None)
