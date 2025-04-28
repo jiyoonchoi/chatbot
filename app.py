@@ -517,7 +517,9 @@ def query():
         else:
             return jsonify(show_buttons("❓ Please click Yes or No.", session_id))
 
-    if conversation_history[session_id].get("awaiting_followup_response"):
+    cmds = {"summarize", "generate_followup", "clear_history"}
+    if (conversation_history[session_id].get("awaiting_followup_response")
+            and message.lower() not in cmds):
         conversation_history[session_id]["awaiting_followup_response"] = False
         last_followup = conversation_history[session_id].pop("last_followup_question", "")
 
