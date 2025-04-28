@@ -338,25 +338,22 @@ def generate_suggested_question(session_id, student_question, feedback=None):
     ta_name = conversation_history[session_id]["question_flow"]["ta"]
     if feedback:
         prompt = (
-            f"""Original question: \"{student_question}\"\n"""
-            f"""Feedback: \"{feedback}\"\n"""
-            f"""Based on the following session id {session_id} which has the name of the student and the paper 
-            \n\n they are reading, generate a refined and more comprehensive version of the question that incorporates the feedback, "
-            "including a reference to the paper and address the TA (something like "Hi {ta_name}! ). 
-            Add any relevant context that the TA might need to understand the question.
-            Add the name of the TA based on the selected TA {ta_name}.\n\n
-            Do not add details that might seem not relevant or that make the question too long\n\n"""
+            f"""Original question: "{student_question}"\n"""
+            f"""Feedback: "{feedback}"\n\n"""
+            f"""Based on session-id **{session_id}** (which encodes the student's name) """
+            f"""generate a refined, concise version of the question.\n"""
+            f"""Address the TA directly, e.g. 'Hi {ta_name}, …'.\n"""
+            f"""• Mention the TwIPS paper if relevant.\n"""
+            f"""• Keep it polite and no longer than necessary.\n"""
         )
     else:
         prompt = (
-            f"""Based on the following student question and the following session id {session_id} which has the name of the student and the paper 
-            \n\n they are reading, generate a refined and more comprehensive version of the student question\n\n"""
-            f"""Remember that the TA does not have context to the conversation, so be sure to include a reference to the paper and address the TA (something like "Hi {ta_name}!).
-            Add any relevant context that the TA might need to understand the question\n\n
-            Do not add details that might seem not relevant or that make the question too long\n\n
-            Add the name of the TA based on the selected TA {ta_name}.\n\n"""
-            f""""Student question: \"{student_question}\"\n\n"""
-            "Suggested improved question:"
+            f"""Based on session-id **{session_id}** generate a clearer version """
+            f"""of the student's question.\n"""
+            f"""Address the TA: 'Hi {ta_name}, …'.\n"""
+            f"""Avoid adding irrelevant detail.\n\n"""
+            f"""Student question: "{student_question}"\n"""
+            f"""Suggested improved question:"""
         )
 
     response = generate(
