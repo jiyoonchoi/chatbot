@@ -102,9 +102,15 @@ def classify_difficulty(question, session_id):
 
 def generate_followup(session_id):
     history = conversation_history.get(session_id, {}).get("messages", [])
-    last_bot_message = next((msg for speaker, msg in reversed(history) if speaker == "bot"), None)
+    last_bot_message = next(
+        (msg for speaker, msg in reversed(history) if speaker == "bot"),
+        None
+    )
+
+    # graceful fallback
     if not last_bot_message:
-        return None
+        return ("I need a little context first — ask me something about "
+                "the paper, then press **Generate Follow-up**! 😊")
 
     prompt = (
         f"You are acting as a TA chatbot helping a student think critically about a research paper.\n\n"
