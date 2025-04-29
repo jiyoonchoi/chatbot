@@ -438,16 +438,16 @@ def query():
         return jsonify({"status": "ignored"})
 
     # ─── 1) TA “respond” button ───
-    # if message.lower() == "respond":
-    #     msg_id       = data.get("message", {}).get("_id")
-    #     student_sess = ta_msg_to_student_session.get(msg_id)
-    #     if student_sess:
-    #         conversation_history.setdefault(student_sess, {"messages":[]})
-    #         conversation_history[student_sess]["awaiting_ta_response"] = True
-    #         return jsonify({
-    #             "text":       "Please type your response to the student.",
-    #             "session_id": student_sess
-    #         })
+    if message.lower() == "respond":
+        msg_id       = data.get("message", {}).get("_id")
+        student_sess = ta_msg_to_student_session.get(msg_id)
+        if student_sess:
+            conversation_history.setdefault(student_sess, {"messages":[]})
+            conversation_history[student_sess]["awaiting_ta_response"] = True
+            return jsonify({
+                "text":       "Please type your response to the student.",
+                "session_id": student_sess
+            })
 
     # ─── 2) TA is typing their response ───
     if conversation_history.get(session_id, {}).get("awaiting_ta_response"):
@@ -595,14 +595,6 @@ def query():
         else:
             msg_id = None
             
-        if message == "respond":
-            # Process TA response prompt. For example, set flag and prompt for typed response.
-            print(data.get("text"))
-            conversation_history[student_session_id]["awaiting_ta_response"] = True
-            print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
-
-            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
-    
     # ───────────────────────────────────────────────────────
     # 6) awaiting_ta_confirmation (class_logistics “Yes/No, Ask TA?”)
     # ───────────────────────────────────────────────────────
