@@ -524,7 +524,7 @@ def build_refinement_buttons(q_flow):
           {
             "type":"button",
             "text":"📝 Manual Edit",
-            "msg": base,
+            "msg": f"Editing: {base}",
             "msg_in_chat_window": True,
             "msg_processing_type": "respondWithMessage"
           },
@@ -748,12 +748,10 @@ def query():
         ta_button_response["session_id"] = session_id
         return jsonify(ta_button_response)
     
-    if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
+    if message in ["ask_TA_Aya", "ask_TA_Jiyoon"]:
         # User selected a TA to ask a question.
         ta_selected = ""
-        if message == "ask_TA_Amanda":
-            ta_selected = "Amanda"
-        elif message == "ask_TA_Jiyoon":
+        if message == "ask_TA_Jiyoon":
             ta_selected = "Jiyoon"
         elif message == "ask_TA_Aya":
             ta_selected = "Aya"
@@ -868,39 +866,27 @@ def query():
                 return jsonify({
                     "text": "Please type your feedback for refining your question.",
                     "session_id": session_id
-                })
-            # *************
-            elif state == "awaiting_manual_input":
-                # Save what the user typed
-                q_flow["suggested_question"] = message
-                q_flow["state"] = "awaiting_refinement_decision"
+                }) 
+            elif message.lower() == "manual_edit" or message.startswith("Editing: "):
+                raw = message.strip()
+                prefix = "Editing: "
+                if raw.startswith(prefix):
+                    edited = raw[len(prefix):].strip()
+                else:
+                    # fallback if they literally typed "manual_edit"
+                    edited = q_flow.get("suggested_question", q_flow.get("raw_question", ""))
 
-                return jsonify({
-                    "text": f"Your manually edited question is:\n\n\"{message}\"\n\n"
-                            "Do you **Approve**, want to **Modify**, or do another **Manual Edit**?",
-                    "attachments": [
-                        {
-                            "actions": [
-                                {"type": "button", "text": "✅ Approve", "msg": "approve", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
-                                {"type": "button", "text": "✏️ Modify", "msg": "modify", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
-                                {"type": "button", "text": "📝 Manual Edit", "msg": "manual_edit", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
-                                {"type": "button", "text": "❌ Cancel", "msg": "cancel", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"},
-                            ]
-                        }
-                    ],
-                    "session_id": session_id
-                })
-            # *************
-            elif message.lower() == "manual_edit":
+                q_flow["suggested_question"] = edited
+                # stay in refinement decision state
                 q_flow["state"] = "awaiting_refinement_decision"
-                clean = q_flow["suggested_question"]
+                
                 return jsonify({
-                "text": (
-                    "✏️ I've loaded your edit above. You can tweak it, then either "
-                    "click **📤 Send** or press Enter. After that, click **Approve** to forward to your TA."
-                ),
-                "session_id": session_id,
-                **build_manual_edit_buttons(clean)
+                    "text": (
+                        f"📝 Here's your manually edited question:\n\n\"{edited}\"\n\n"
+                        "Would you like to **Approve**, **Modify**, or another **Manual Edit**?"
+                    ),
+                    "session_id": session_id,
+                    **build_refinement_buttons(q_flow)
                 })
             elif message.lower() == "cancel":
                 conversation_history[session_id]["question_flow"] = None
@@ -924,23 +910,7 @@ def query():
                 "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested_clean}\"\n\nDo you **approve**, want to **Modify**, do a **Manual Edit**, or **cancel**?",
                 "session_id": session_id, 
                 **build_refinement_buttons(q_flow)
-
-        # State 4: Handling manual edit input
-        if state == "awaiting_manual_edit":
-            # Directly store the manually edited question as the suggested/final version.
-            edited = message.strip()
-            q_flow["suggested_question"] = edited
-            q_flow["state"] = "awaiting_refinement_decision"
-            return jsonify({
-                "text": (
-                "Here's your manually edited question:\n\n"
-                f"\"{edited}\"\n\n"
-                "What would you like to do next?"
-                ),
-                "session_id": session_id,
-                **build_refinement_buttons(q_flow)
             })
-    
     # Look up the student session ID using the mapping.
 
     if ta_msg_to_student_session:
