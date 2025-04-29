@@ -435,30 +435,29 @@ def query():
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
-    session_id = data.get("session_id") or get_session_id(data)
+    session_id = get_session_id(data)
 
     # ——————————————————————————————
     # Human‐TA “Respond to Student” handler
     # ——————————————————————————————
     if message.lower() == "respond":
-        # Rocket.Chat will include the original student‐message _id in data["message"]["_id"]
         msg_id = data.get("message", {}).get("_id")
-        student_session = ta_msg_to_student_session.get(msg_id)
-        if student_session:
-            # queue us up to read the next TA‐typed message as the answer
-            conversation_history.setdefault(student_session, {"messages":[]})
-            conversation_history[student_session]["awaiting_ta_response"] = True
-            # tell the TA to go ahead and type
+        student_sess = ta_msg_to_student_session.get(msg_id)
+        if student_sess:
+            conversation_history.setdefault(student_sess, {"messages":[]})
+            conversation_history[student_sess]["awaiting_ta_response"] = True
             return jsonify({
                 "text": "Please type your response to the student.",
-                "session_id": student_session
+                "session_id": student_sess
             })
     
     # ————————————————————————
     # TA is now typing their answer
     # ————————————————————————
     if conversation_history.get(session_id, {}).get("awaiting_ta_response"):
+        # clear the flag
         conversation_history[session_id]["awaiting_ta_response"] = False
+        # forward TA’s typed reply back to the student
         forward_message_to_student(message, user, session_id)
         return jsonify({
             "text": "✅ Your response has been forwarded to the student.",
@@ -764,9 +763,8 @@ def query():
                 "session_id": session_id,
                 **build_refinement_buttons(q_flow)
             })
-    
-    # Look up the student session ID using the mapping.
 
+    # Look up the student session ID using the mapping.
     if ta_msg_to_student_session:
         msg_id = next(reversed(ta_msg_to_student_session))
         student_username = ta_msg_to_student_session[msg_id]
@@ -785,7 +783,15 @@ def query():
             return jsonify({"text": response, "session_id": session_id})
     else:
         msg_id = None
-   
+
+    if message == "respond":
+            # Process TA response prompt. For example, set flag and prompt for typed response.
+            print(data.get("text"))
+            conversation_history[student_session_id]["awaiting_ta_response"] = True
+            print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
+
+            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
+
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
