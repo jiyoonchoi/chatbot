@@ -451,50 +451,31 @@ def query():
         pdf_ready.pop(session_id, None)
 
     if conversation_history[session_id].get("awaiting_ta_confirmation"):
-        choice = (data.get("value") or "").lower()
-        # treat a raw "ask_TA" text as "Yes"
-        if choice == "yes" or message == "ask_TA":
+        # if user directly picks a TA, clear confirmation and let the TA-flow handlers run
+        if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
             conversation_history[session_id]["awaiting_ta_confirmation"] = False
-
-            # Instead of starting question_flow immediately, SHOW TA selection buttons!
-            return jsonify({
-                "text": "👩‍🏫 Please select which TA you would like to ask:",
-                "attachments": [{
-                    "actions": [
-                        {
-                            "type": "button",
-                            "text": "Ask TA Aya",
-                            "msg": "ask_TA_Aya",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "Ask TA Jiyoon",
-                            "msg": "ask_TA_Jiyoon",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        },
-                        {
-                            "type": "button",
-                            "text": "Ask TA Amanda",
-                            "msg": "ask_TA_Amanda",
-                            "msg_in_chat_window": True,
-                            "msg_processing_type": "sendMessage"
-                        }
-                    ]
-                }],
-                "session_id": session_id
-            })
-
-        elif choice == "no" or message.lower() == "no":
-            conversation_history[session_id]["awaiting_ta_confirmation"] = False
-            text = "✅ No problem! Let's keep exploring the paper."
-            conversation_history[session_id]["messages"].append(("bot", text))
-            return jsonify(show_buttons(text, session_id))
-
+            # fall through into the TA question workflow below
         else:
-            return jsonify(show_buttons("❓ Please click Yes or No.", session_id))
+            choice = (data.get("value") or "").lower()
+            if message.lower() in ["yes","y"] or choice in ["yes","y"] or message == "ask_TA":
+                conversation_history[session_id]["awaiting_ta_confirmation"] = False
+                return jsonify({
+                    "text": "👩‍🏫 Please select which TA you would like to ask:",
+                    "attachments": [{
+                        "actions": [
+                            { "type":"button","text":"Ask TA Aya","msg":"ask_TA_Aya","msg_in_chat_window":True,"msg_processing_type":"sendMessage" },
+                            { "type":"button","text":"Ask TA Jiyoon","msg":"ask_TA_Jiyoon","msg_in_chat_window":True,"msg_processing_type":"sendMessage" },
+                            { "type":"button","text":"Ask TA Amanda","msg":"ask_TA_Amanda","msg_in_chat_window":True,"msg_processing_type":"sendMessage" }
+                        ]
+                    }],
+                    "session_id": session_id
+                })
+            elif message.lower() in ["no","n"] or choice in ["no","n"]:
+                conversation_history[session_id]["awaiting_ta_confirmation"] = False
+                text = "✅ No problem! Let's keep exploring the paper."
+                return jsonify(show_buttons(text, session_id))
+            else:
+                return jsonify(show_buttons("❓ Please click Yes or No.", session_id))
 
     # Special admin commands
     if message.lower() == "clear_history":
