@@ -428,29 +428,28 @@ def send_direct_message_to_TA(question, session_id, ta_username):
 @app.route('/query', methods=['POST'])
 def query():
     print("DEBUG: Handling query...")
-    data = request.get_json() or request.form
-    user = data.get("user_name", "Unknown")
-    message = data.get("text", "").strip()
+    data       = request.get_json() or request.form
+    user       = data.get("user_name", "Unknown")
+    message    = (data.get("text") or "").strip()
     session_id = data.get("session_id") or get_session_id(data)
 
+    # ─── ignore empty / bot messages ───
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
-    # TA responds to student
-    if message.lower() == "respond":
-        print("DEBUG: Respond button clicked")
-        msg_id       = data.get("message", {}).get("_id")
-        student_sess = ta_msg_to_student_session.get(msg_id)
-        if student_sess:
-            print(f"DEBUG: Responding to student session {student_sess}")
-            conversation_history.setdefault(student_sess, {"messages":[]})
-            conversation_history[student_sess]["awaiting_ta_response"] = True
-            return jsonify({
-                "text": "Please type your response to the student.",
-                "session_id": student_sess
-            })
-    
-    # TA is typing their response
+    # ─── 1) TA “respond” button ───
+    # if message.lower() == "respond":
+    #     msg_id       = data.get("message", {}).get("_id")
+    #     student_sess = ta_msg_to_student_session.get(msg_id)
+    #     if student_sess:
+    #         conversation_history.setdefault(student_sess, {"messages":[]})
+    #         conversation_history[student_sess]["awaiting_ta_response"] = True
+    #         return jsonify({
+    #             "text":       "Please type your response to the student.",
+    #             "session_id": student_sess
+    #         })
+
+    # ─── 2) TA is typing their response ───
     if conversation_history.get(session_id, {}).get("awaiting_ta_response"):
         conversation_history[session_id]["awaiting_ta_response"] = False
         forward_message_to_student(message, user, session_id)
@@ -459,235 +458,144 @@ def query():
             "session_id": session_id
         })
 
+    # ─── 3) Skip follow-up ───
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
         conversation_history[session_id].pop("last_followup_question", None)
-        text = "No worries! Let's continue whenever you're ready. 📚\n Please ask another question about this week's reading!"
+        text = "No worries! Let's continue whenever you're ready. 📚 Please ask another question about this week's reading!"
         conversation_history[session_id]["messages"].append(("bot", text))
         return jsonify(show_buttons(text, session_id))
 
+    # ─── 4) Initialize session state ───
     if session_id not in conversation_history:
         conversation_history[session_id] = {"messages": []}
         summary_cache.pop(session_id, None)
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
 
-    # ----------------------------
-    # TA Question Workflow
-    # ----------------------------
+    # ───────────────────────────────────────────────────────
+    # 5) TA QUESTION FLOW
+    # ───────────────────────────────────────────────────────
 
-    if message == "ask_TA": 
-        conversation_history[session_id]["awaiting_ta_question"] = False
-        conversation_history[session_id].pop("student_question", None)
-        conversation_history[session_id].pop("suggested_question", None)
-        conversation_history[session_id].pop("final_question", None)
+    # 5a) “Ask TA”
+    if message == "ask_TA":
+        return jsonify({**build_TA_button(), "session_id": session_id})
 
-        ta_button_response = build_TA_button()
-        ta_button_response["session_id"] = session_id
-        return jsonify(ta_button_response)
-    
-    if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
-        # User selected a TA to ask a question.
-        ta_selected = ""
-        if message == "ask_TA_Jiyoon":
-            ta_selected = "Jiyoon"
-        elif message == "ask_TA_Aya":
-            ta_selected = "Aya"
-        elif message == "ask_TA_Amanda":
-            ta_selected = "Amanda"
-            
-        # Initialize question_flow state
+    # 5b) Student picks a TA
+    if message in ("ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"):
+        name = {"ask_TA_Aya":"Aya","ask_TA_Jiyoon":"Jiyoon","ask_TA_Amanda":"Amanda"}[message]
         conversation_history[session_id]["question_flow"] = {
-            "ta": ta_selected,
-            "state": "awaiting_question",  # waiting for the student to type the question
+            "ta": name,
+            "state": "awaiting_question",
             "raw_question": "",
             "suggested_question": ""
         }
         return jsonify({
-            "text": f"Please type your question for TA {ta_selected}.",
+            "text":       f"Please type your question for TA {name}.",
             "session_id": session_id
         })
-   
-    # Check if we are in the middle of a TA question workflow
-    if conversation_history[session_id].get("question_flow"):
-        # If the user types the safeguard exit keyword "exit", cancel the TA flow.
-        if message.lower() == "exit":
-            conversation_history[session_id]["question_flow"] = None
-            return jsonify(show_buttons("Exiting TA query mode. How can I help you with the research paper?", session_id))
-    
-        q_flow = conversation_history[session_id]["question_flow"]
-        state = q_flow.get("state", "")
-        
-        # State 1: Awaiting the initial question from the student.
+
+    # 5c) Inside the flow
+    if "question_flow" in conversation_history[session_id]:
+        qf    = conversation_history[session_id]["question_flow"]
+        state = qf["state"]
+
+        # --- State: awaiting_question ---
         if state == "awaiting_question":
-            # Save the raw question
-            q_flow["raw_question"] = message
-            # Ask whether to refine or send the question
-            q_flow["state"] = "awaiting_decision"
+            qf["raw_question"] = message
+            qf["state"]        = "awaiting_decision"
             return jsonify({
-                "text": f"You typed: \"{message}\".\nWould you like to **refine** your question, **send** it as is, or **cancel**?",
-                "attachments": [
-                    {
-                        "actions": [
-                            {
-                                "type": "button",
-                                "text": "✏️ Refine",
-                                "msg": "refine",
-                                "msg_in_chat_window": True,
-                                "msg_processing_type": "sendMessage"
-                            },
-                            {
-                                "type": "button",
-                                "text": "✅ Send",
-                                "msg": "send",
-                                "msg_in_chat_window": True,
-                                "msg_processing_type": "sendMessage"
-                            }, 
-                            {
-                                "type": "button",
-                                "text": "❌ Cancel",
-                                "msg": "cancel",
-                                "msg_in_chat_window": True,
-                                "msg_processing_type": "sendMessage"
-                            }
-                        ]
-                    }
-                ],
+                "text":       f'You typed: "{message}".\nWould you like to **Refine**, **Send**, or **Cancel**?',
+                "attachments":[{"actions":[
+                    {"type":"button","text":"✏️ Refine","msg":"refine","msg_processing_type":"sendMessage"},
+                    {"type":"button","text":"✅ Send","msg":"send","msg_processing_type":"sendMessage"},
+                    {"type":"button","text":"❌ Cancel","msg":"cancel","msg_processing_type":"sendMessage"}
+                ]}],
                 "session_id": session_id
             })
-        
-    # State 2: Awaiting decision from student on whether to refine or send
+
+        # --- State: awaiting_decision ---
         if state == "awaiting_decision":
-            if message.lower() == "send":
-                ta_username = ""
-
-                if q_flow["ta"] == "Aya":
-                    ta_username = "aya.ismail"
-                elif q_flow["ta"] == "Jiyoon":
-                    ta_username = "jiyoon.choi"
-                elif q_flow["ta"] == "Amanda":
-                    ta_username = "amanda.wu"
-
-                final_question = q_flow.get("suggested_question") or q_flow.get("raw_question")
-                send_direct_message_to_TA(final_question, user, ta_username)
-                conversation_history[session_id]["question_flow"] = None
-                return jsonify(show_buttons(f"Your question has been sent to TA {q_flow['ta']}!", session_id
-                ))
-            elif message.lower() == "cancel":
-                conversation_history[session_id]["question_flow"] = None
-                return jsonify(show_buttons("Your TA question process has been canceled. Let me know if you need anything else.", session_id
-                ))
-            elif message.lower() == "refine":
-                # Default refine using LLM feedback
-                suggested = generate_suggested_question(session_id, q_flow["raw_question"])[0]
-                q_flow["suggested_question"] = suggested
-                q_flow["state"] = "awaiting_refinement_decision"
+            cmd = message.lower()
+            if cmd == "send":
+                ta_user = "aya.ismail" if qf["ta"]=="Aya" else "jiyoon.choi"
+                final_q = qf.get("suggested_question") or qf["raw_question"]
+                send_direct_message_to_TA(final_q, user, ta_user)
+                del conversation_history[session_id]["question_flow"]
+                return jsonify(show_buttons(f"Your question has been sent to TA {qf['ta']}!", session_id))
+            if cmd == "cancel":
+                del conversation_history[session_id]["question_flow"]
+                return jsonify(show_buttons("TA question canceled.", session_id))
+            if cmd == "refine":
+                _, clean = generate_suggested_question(session_id, qf["raw_question"])
+                qf["suggested_question"] = clean
+                qf["state"]              = "awaiting_refinement_decision"
                 return jsonify({
-                    "text": f"Here is a suggested version of your question:\n\n\"{suggested}\"\n\nDo you **approve** this version, want to **modify**, do a **Manual Edit**, or **cancel**?",
-                    "session_id": session_id, 
-                    **build_refinement_buttons(q_flow)
-                    
-                })
-            else:
-                return jsonify({
-                    "text": "Please choose either **refine**, **send**, or **cancel**.",
-                    "session_id": session_id
-                })
-
-        # Handling the decision in the refinement phase:
-        if state == "awaiting_refinement_decision":
-            print(f"DEBUGGING****: {session_id} - {message}")
-            if message.lower() == "approve":
-                ta_username = ""
-                if q_flow["ta"] == "Aya":
-                    ta_username = "aya.ismail"
-                elif q_flow["ta"] == "Jiyoon":
-                    ta_username = "jiyoon.choi"
-                elif q_flow["ta"] == "Amanda":
-                    ta_username = "amanda.wu"
-
-                final_question = q_flow.get("suggested_question") or q_flow.get("raw_question")
-                send_direct_message_to_TA(final_question, user, ta_username)
-                conversation_history[session_id]["question_flow"] = None
-                payload = show_buttons(
-                    f"Your question has been sent to TA {q_flow['ta']}!",
-                    session_id
-                )
-                payload["attachments"].append(build_refinement_buttons(q_flow))
-                return jsonify(payload)
-               
-            elif message.lower() == "modify":
-                q_flow["state"] = "awaiting_feedback"
-                return jsonify({
-                    "text": "Please type your feedback for refining your question.",
-                    "session_id": session_id
-                }) 
-            elif message.lower() == "manual_edit" or message.startswith("Editing: "):
-                raw = message.strip()
-                prefix = "Editing: "
-                if raw.startswith(prefix):
-                    edited = raw[len(prefix):].strip()
-                else:
-                    # fallback if they literally typed "manual_edit"
-                    edited = q_flow.get("suggested_question", q_flow.get("raw_question", ""))
-
-                q_flow["suggested_question"] = edited
-                # stay in refinement decision state
-                q_flow["state"] = "awaiting_refinement_decision"
-                
-                return jsonify({
-                    "text": (
-                        f"📝 Here's your manually edited question:\n\n\"{edited}\"\n\n"
-                        "Would you like to **Approve**, **Modify**, or another **Manual Edit**?"
-                    ),
+                    "text":       f'Suggested: "{clean}". Approve, modify, manual edit, or cancel?',
                     "session_id": session_id,
-                    **build_refinement_buttons(q_flow)
-                })
-            elif message.lower() == "cancel":
-                conversation_history[session_id]["question_flow"] = None
-                return jsonify(show_buttons("Your TA question process has been canceled. Let me know if you need anything else.", session_id
-                ))
-            else:
-                return jsonify({
-                    "text": "Please choose **approve**, **Modify**, **Manual Edit**, or **Cancel**.",
-                    "session_id": session_id
+                    **build_refinement_buttons(qf)
                 })
 
-        # State 3: Awaiting feedback for LLM refinement
+        # --- State: awaiting_refinement_decision ---
+        if state == "awaiting_refinement_decision":
+            cmd = message.lower()
+            if cmd == "approve":
+                ta_user = "aya.ismail" if qf["ta"]=="Aya" else "jiyoon.choi"
+                final_q = qf.get("suggested_question") or qf["raw_question"]
+                send_direct_message_to_TA(final_q, user, ta_user)
+                del conversation_history[session_id]["question_flow"]
+                return jsonify(show_buttons(f"Sent to TA {qf['ta']}!", session_id))
+            if cmd == "modify":
+                qf["state"] = "awaiting_feedback"
+                return jsonify({"text":"Please give feedback to refine your question.","session_id":session_id})
+            if message.startswith("Editing: "):
+                edited = message.split("Editing: ",1)[1]
+                qf["suggested_question"] = edited
+                return jsonify({
+                    "text":       f'📝 Manually edited: "{edited}". Approve, modify, manual edit, or cancel?',
+                    "session_id": session_id,
+                    **build_refinement_buttons(qf)
+                })
+            if cmd == "cancel":
+                del conversation_history[session_id]["question_flow"]
+                return jsonify(show_buttons("TA question canceled.", session_id))
+
+        # --- State: awaiting_feedback ---
         if state == "awaiting_feedback":
             feedback = message
             # Combine the raw question and feedback to generate a refined version.
-            base_question = q_flow.get("suggested_question", q_flow["raw_question"])
+            base_question = qf.get("suggested_question", qf["raw_question"])
             new_suggested, new_suggested_clean = generate_suggested_question(session_id, base_question, feedback)
-            q_flow["suggested_question"] = new_suggested_clean
-            q_flow["state"] = "awaiting_refinement_decision"
+            qf["suggested_question"] = new_suggested_clean
+            qf["state"] = "awaiting_refinement_decision"
             return jsonify({
                 "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested_clean}\"\n\nDo you **approve**, want to **Modify**, do a **Manual Edit**, or **cancel**?",
                 "session_id": session_id,
-                **build_refinement_buttons(q_flow)
+                **build_refinement_buttons(qf)
             })
-    # Look up the student session ID using the mapping.
 
-    if ta_msg_to_student_session:
-        msg_id = next(reversed(ta_msg_to_student_session))
-        student_username = ta_msg_to_student_session[msg_id]
-        student_session_id = f"session_{student_username}_twips_research"
-
-        if not student_session_id:
-            return jsonify({"error": "No student session mapped for this message ID."}), 400
+        # Look up the student session ID using the mapping.
         
-        if conversation_history[student_session_id].get("awaiting_ta_response"):
-        # Assume this message is the TA's typed answer.
-            conversation_history[student_session_id]["awaiting_ta_response"] = False
-            conversation_history[student_session_id]["messages"].append(("TA", message))
-            print(f"DEBUG: Received TA reply for session {student_session_id}: {message}")
-            forward_message_to_student(message, session_id, student_session_id)
-            response = f"Your response has been forwarded to student {student_username}."
-            return jsonify({"text": response, "session_id": session_id})
-    else:
-        msg_id = None
-   
-    if message == "respond":
+        if ta_msg_to_student_session:
+            msg_id = next(reversed(ta_msg_to_student_session))
+            student_username = ta_msg_to_student_session[msg_id]
+            student_session_id = f"session_{student_username}_twips_research"
+
+            if not student_session_id:
+                return jsonify({"error": "No student session mapped for this message ID."}), 400
+            
+            if conversation_history[student_session_id].get("awaiting_ta_response"):
+            # Assume this message is the TA's typed answer.
+                conversation_history[student_session_id]["awaiting_ta_response"] = False
+                conversation_history[student_session_id]["messages"].append(("TA", message))
+                print(f"DEBUG: Received TA reply for session {student_session_id}: {message}")
+                forward_message_to_student(message, session_id, student_session_id)
+                response = f"Your response has been forwarded to student {student_username}."
+                return jsonify({"text": response, "session_id": session_id})
+        else:
+            msg_id = None
+            
+        if message == "respond":
             # Process TA response prompt. For example, set flag and prompt for typed response.
             print(data.get("text"))
             conversation_history[student_session_id]["awaiting_ta_response"] = True
@@ -695,45 +603,36 @@ def query():
 
             return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
     
-    
-    # ----------------------------
-    # End of TA Question Workflow
-    # ----------------------------
-    if conversation_history[session_id].get("awaiting_ta_confirmation"):
-        if message.lower() in ["yes", "y"]:
-            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
-            # Then start the TA question flow: show TA selection (or directly send if a default TA is used)
-            ta_button_response = build_TA_button()  # reuse your TA button builder
-            ta_button_response["session_id"] = session_id
-            return jsonify(ta_button_response)
-        else:
-            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
-            # Fall back to answering the question using the document context
-            answer = generate_response(
-                "",
-                f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}",
-                session_id
-            )
-            conversation_history[session_id]["messages"].append(("bot", answer))
-            # Optionally add a follow-up prompt here
-            return jsonify(show_buttons(answer, session_id))
+    # ───────────────────────────────────────────────────────
+    # 6) awaiting_ta_confirmation (class_logistics “Yes/No, Ask TA?”)
+    # ───────────────────────────────────────────────────────
+    if conversation_history[session_id].pop("awaiting_ta_confirmation", False):
+        if message.lower() in ("yes","y","ask_ta"):
+            return jsonify({**build_TA_button(), "session_id": session_id})
+        # “No” → fall back to PDF answer
+        ensure_pdf_processed(session_id)
+        diff = classify_difficulty(message, session_id)
+        answer = ( generate_response("", f"Answer factually: {message}", session_id)
+                   if diff=="factual"
+                   else generate_response("", f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper: {message}", session_id)
+                 )
+        conversation_history[session_id]["messages"].append(("bot", answer))
+        return jsonify(show_buttons(answer, session_id, followup_button=True))
 
-    
-    # Special admin commands
+    # ──────────────
+    # 7) Special commands
+    # ──────────────
     if message.lower() == "clear_history":
         conversation_history.pop(session_id, None)
         summary_cache.pop(session_id, None)
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
         return jsonify(show_buttons("✅ History and caches cleared.", session_id))
-
     if message.lower() == "summarize":
         if not ensure_pdf_processed(session_id):
             return jsonify(show_buttons("PDF not processed yet. Please try again shortly.", session_id))
-        summary = generate_response("", "Summarize the uploaded paper in 3-4 sentences.", session_id)
-        summary_cache[session_id] = summary
-        return jsonify(show_buttons(summary, session_id))
-
+        summary_cache[session_id] = generate_response("", "Summarize the uploaded paper in 3-4 sentences.", session_id)
+        return jsonify(show_buttons(summary_cache[session_id], session_id))
 
     # ----------------------------
     # Follow-up Question Workflow
