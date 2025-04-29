@@ -799,43 +799,51 @@ def query():
     if classification == "content_about_paper":
         difficulty = classify_difficulty(message, session_id)
         ensure_pdf_processed(session_id)
-        if difficulty == "factual":
-            print("DEBUG: Factual question detected.")
-            # Special case for metadata questions
-            if any(keyword in message.lower() for keyword in ["author", "authors", "who wrote", "title", "publication"]):
-                # Very strict system prompt for metadata
-                system_prompt = (
-                    "You are a TA chatbot answering factual metadata questions about the uploaded TwIPS paper. "
-                    "ONLY use the title page and the first page of the paper. "
-                    "Ignore all references or citations. "
-                    "If the requested information (like authorship or title) is not clearly stated, say so."
-                )
-                prompt = (
-                    "Based solely on the front matter (title page and first page) of the uploaded TwIPS paper, "
-                    f"answer the following factual question:\n\n{message}\n\n"
-                    "If the information is unclear, say so politely."
-                )
-                answer = generate(
-                    model='4o-mini',
-                    system=system_prompt,
-                    query=prompt,
-                    session_id=session_id,
-                    temperature=0.0,
-                    lastk=5,
-                    rag_usage=True,
-                    rag_threshold=0.02,  # tighter threshold
-                    rag_k=10  # broader top-k search
-                )
-                if isinstance(answer, dict):
-                    answer = answer.get("response", "").strip()
-                else:
-                    answer = answer.strip()
-            else:
-                # Normal factual answering
-                answer = generate_response("", f"Answer factually: {message}", session_id)
+
+        # Use LLM to detect metadata questions (authors, title, publication, etc.)
+        metadata_prompt = (
+            "Is the following question asking for metadata (authors, title, publication details) "
+            "about the uploaded TwIPS paper? Respond with exactly 'yes' or 'no'.\n\n"
+            f"Question: \"{message}\""
+        )
+        is_metadata = generate_response("", metadata_prompt, session_id).lower().startswith("yes")
+
+        if is_metadata:
+            # Very strict system prompt for metadata
+            system_prompt = (
+                "You are a TA chatbot answering factual metadata questions about the uploaded TwIPS paper. "
+                "ONLY use the title page and first page of the paper. "
+                "Ignore all references or citations. "
+                "If the requested information (like authorship or title) is not clearly stated, say so."
+            )
+            prompt = (
+                "Based solely on the front matter (title page and first page) of the uploaded TwIPS paper, "
+                f"answer the following question:\n\n{message}\n\n"
+                "If the information is unclear, say so politely."
+            )
+            answer = generate(
+                model='4o-mini',
+                system=system_prompt,
+                query=prompt,
+                session_id=session_id,
+                temperature=0.0,
+                lastk=5,
+                rag_usage=True,
+                rag_threshold=0.02,
+                rag_k=10
+            )
+            answer = answer["response"].strip() if isinstance(answer, dict) else answer.strip()
         else:
-            print("DEBUG: Conceptual question detected.")
-            answer = generate_response("", f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}", session_id)
+            # Normal factual vs conceptual answering
+            if difficulty == "factual":
+                answer = generate_response("", f"Answer factually: {message}", session_id)
+            else:
+                answer = generate_response(
+                    "", 
+                    f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}", 
+                    session_id
+                )
+
         conversation_history[session_id]["messages"].append(("bot", answer))
         return jsonify(show_buttons(answer, session_id, followup_button=True))
 
