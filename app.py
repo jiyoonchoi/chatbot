@@ -706,26 +706,27 @@ def query():
     # ----------------------------
 
     # only handle the Yes/No confirmation when NOT already in a TA question flow
-        # only handle the Yes/No confirmation when NOT already in a TA flow
-    if conversation_history[session_id].pop("awaiting_ta_confirmation", None):
-        if message.lower() in ("yes", "y"):
+    if conversation_history[session_id].pop("awaiting_ta_confirmation", False):
+        # “Yes” or “Ask TA” → start the TA flow
+        if message.lower() in ("yes", "y") or message == "ask_TA":
             resp = build_TA_button()
             resp["session_id"] = session_id
             return jsonify(resp)
+        # “No” → fallback to a paper‐based answer
+        ensure_pdf_processed(session_id)
+        difficulty = classify_difficulty(message, session_id)
+        if difficulty == "factual":
+            answer = generate_response(
+                "", f"Answer factually: {message}", session_id
+            )
         else:
-            # fall back to answering from the PDF
-            ensure_pdf_processed(session_id)
-            diff = classify_difficulty(message, session_id)
-            if diff == "factual":
-                answer = generate_response("", f"Answer factually: {message}", session_id)
-            else:
-                answer = generate_response(
-                    "",
-                    f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper: {message}",
-                    session_id
-                )
-            conversation_history[session_id]["messages"].append(("bot", answer))
-            return jsonify(show_buttons(answer, session_id, followup_button=True))
+            answer = generate_response(
+                "", 
+                f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}", 
+                session_id
+            )
+        conversation_history[session_id]["messages"].append(("bot", answer))
+        return jsonify(show_buttons(answer, session_id, followup_button=True))
     
     # Special admin commands
     if message.lower() == "clear_history":
