@@ -609,18 +609,10 @@ def query():
     
     if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
         # User selected a TA to ask a question.
-        ta_selected = ""
-        if message == "ask_TA_Amanda":
-            ta_selected = "Amanda"
-        elif message == "ask_TA_Jiyoon":
-            ta_selected = "Jiyoon"
-        elif message == "ask_TA_Aya":
-            ta_selected = "Aya"
-            
-        # Initialize question_flow state
+        ta_selected = { "ask_TA_Aya":"Aya", "ask_TA_Jiyoon":"Jiyoon", "ask_TA_Amanda":"Amanda" }[message]
         conversation_history[session_id]["question_flow"] = {
             "ta": ta_selected,
-            "state": "awaiting_question",  # waiting for the student to type the question
+            "state": "awaiting_question",
             "raw_question": "",
             "suggested_question": ""
         }
@@ -637,10 +629,10 @@ def query():
             return jsonify(show_buttons("Exiting TA query mode. How can I help you with the research paper?", session_id))
     
         # This ensures all of your refine/send/cancel logic is preserved exactly.
-        q_flow = conversation_history.get(session_id, {}).get("question_flow")
+        q_flow = conversation_history[session_id].get("question_flow")
         if q_flow:
             # ─── State 1: Awaiting the initial question
-            if q_flow.get("state") == "awaiting_question":
+            if q_flow["state"] == "awaiting_question":
                 q_flow["raw_question"] = message
                 q_flow["state"] = "awaiting_decision"
                 return jsonify({
@@ -656,11 +648,11 @@ def query():
                 })
 
             # ─── State 2: Awaiting **refine/send/cancel** decision
-            if q_flow.get("state") == "awaiting_decision":
+            if q_flow["state"] == "awaiting_decision":
                 if message.lower() == "send":
                     conversation_history[session_id].pop("awaiting_ta_confirmation", None)
                     ta_username = "aya.ismail" if q_flow["ta"] == "Aya" else "jiyoon.choi"
-                    final_q = q_flow.get("suggested_question") or q_flow.get("raw_question")
+                    final_q = q_flow["suggested_question"] or q_flow["raw_question"]
                     send_direct_message_to_TA(final_q, user, ta_username)
                     conversation_history[session_id]["question_flow"] = None
                     return jsonify(show_buttons(f"Your question has been sent to TA {q_flow['ta']}!", session_id))
