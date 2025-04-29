@@ -573,28 +573,23 @@ def query():
                 "session_id": session_id,
                 **build_refinement_buttons(qf)
             })
-
-        # Look up the student session ID using the mapping.
         
-        if ta_msg_to_student_session:
-            msg_id = next(reversed(ta_msg_to_student_session))
-            student_username = ta_msg_to_student_session[msg_id]
-            student_session_id = f"session_{student_username}_twips_research"
+    # ───────────────────────────────────────────────────────
+    # 5d) TA→Student forwarding (reverse mapping)
+    # ───────────────────────────────────────────────────────
+    if ta_msg_to_student_session:
+        msg_id = next(reversed(ta_msg_to_student_session))
+        student_username   = ta_msg_to_student_session[msg_id]
+        student_session_id = f"session_{student_username}_twips_research"
 
-            if not student_session_id:
-                return jsonify({"error": "No student session mapped for this message ID."}), 400
-            
-            if conversation_history[student_session_id].get("awaiting_ta_response"):
-            # Assume this message is the TA's typed answer.
-                conversation_history[student_session_id]["awaiting_ta_response"] = False
-                conversation_history[student_session_id]["messages"].append(("TA", message))
-                print(f"DEBUG: Received TA reply for session {student_session_id}: {message}")
-                forward_message_to_student(message, session_id, student_session_id)
-                response = f"Your response has been forwarded to student {student_username}."
-                return jsonify({"text": response, "session_id": session_id})
-        else:
-            msg_id = None
-            
+        if conversation_history.get(student_session_id, {}).get("awaiting_ta_response"):
+            conversation_history[student_session_id]["awaiting_ta_response"] = False
+            forward_message_to_student(message, session_id, student_session_id)
+            return jsonify({
+                "text":       f"✅ Your response has been forwarded to student {student_username}.",
+                "session_id": session_id
+            })
+
     # ───────────────────────────────────────────────────────
     # 6) awaiting_ta_confirmation (class_logistics “Yes/No, Ask TA?”)
     # ───────────────────────────────────────────────────────
