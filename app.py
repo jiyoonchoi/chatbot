@@ -671,12 +671,12 @@ def query():
                     return jsonify(show_buttons("Your TA question process has been canceled.", session_id))
 
                 if message.lower() == "refine":
-                    suggested, clean = generate_suggested_question(session_id, q_flow["raw_question"])
-                    q_flow["suggested_question"] = clean
+                    suggested = generate_suggested_question(session_id, q_flow["raw_question"])
+                    q_flow["suggested_question"] = suggested
                     q_flow["state"] = "awaiting_refinement_decision"
                     return jsonify({
-                        "text": f"Suggested: \"{clean}\".\nApprove, modify, manual edit, or cancel?",
-                        "session_id": session_id,
+                        "text": f"Here is a suggested version of your question:\n\n\"{suggested}\"\n\nDo you **approve** this version, want to **modify**, do a **Manual Edit**, or **cancel**?",
+                        "session_id": session_id, 
                         **build_refinement_buttons(q_flow)
                     })
 
