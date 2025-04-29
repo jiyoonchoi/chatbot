@@ -659,6 +659,7 @@ def query():
             # ─── State 2: Awaiting **refine/send/cancel** decision
             if q_flow.get("state") == "awaiting_decision":
                 if message.lower() == "send":
+                    conversation_history[session_id].pop("awaiting_ta_confirmation", None)
                     ta_username = "aya.ismail" if q_flow["ta"] == "Aya" else "jiyoon.choi"
                     final_q = q_flow.get("suggested_question") or q_flow.get("raw_question")
                     send_direct_message_to_TA(final_q, user, ta_username)
@@ -666,6 +667,7 @@ def query():
                     return jsonify(show_buttons(f"Your question has been sent to TA {q_flow['ta']}!", session_id))
 
                 if message.lower() == "cancel":
+                    conversation_history[session_id].pop("awaiting_ta_confirmation", None)
                     conversation_history[session_id]["question_flow"] = None
                     return jsonify(show_buttons("Your TA question process has been canceled.", session_id))
 
