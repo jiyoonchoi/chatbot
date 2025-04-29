@@ -438,6 +438,22 @@ def query():
     session_id = get_session_id(data)
 
     # ——————————————————————————————
+    # Human‐TA “Respond to Student” handler
+    # ——————————————————————————————
+    if message.lower() == "respond":
+        # Rocket.Chat will include the original message’s _id in data["message"]["_id"]:
+        msg_id = data.get("message", {}).get("_id")
+        student_session = ta_msg_to_student_session.get(msg_id)
+        if student_session:
+            # flag that we’re awaiting the TA’s typed reply
+            conversation_history.setdefault(student_session, {"messages":[]})
+            conversation_history[student_session]["awaiting_ta_response"] = True
+            return jsonify({
+                "text": "Please type your response to the student.",
+                "session_id": student_session
+            })
+
+    # ——————————————————————————————
     # TA‐flow: consume the first student question
     # ——————————————————————————————
     q_flow = conversation_history.get(session_id, {}).get("question_flow")
