@@ -908,7 +908,7 @@ def query():
             q_flow["state"] = "awaiting_refinement_decision"
             return jsonify({
                 "text": f"Here is an updated suggested version of your question:\n\n\"{new_suggested_clean}\"\n\nDo you **approve**, want to **Modify**, do a **Manual Edit**, or **cancel**?",
-                "session_id": session_id, 
+                "session_id": session_id,
                 **build_refinement_buttons(q_flow)
             })
     # Look up the student session ID using the mapping.
@@ -1073,8 +1073,7 @@ def query():
             answer_with_prompt = f"{answer}\n\n{universal_followup}"
         else:
             answer_with_prompt = answer
-        return jsonify(show_button_buttons(answer_with_prompt, session_id
-        ))
+        return jsonify(show_button_options(answer_with_prompt, session_id))
 
     elif classification == "human_ta_query": 
         conversation_history[session_id]["awaiting_ta_confirmation"] = True
