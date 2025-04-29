@@ -431,15 +431,12 @@ def query():
     data = request.get_json() or request.form
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
-
     session_id = data.get("session_id") or get_session_id(data)
 
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
-    # ────────────────────────────────
-    # Human‐TA “Respond” button
-    # ────────────────────────────────
+    # TA responds to student
     if message.lower() == "respond":
         print("DEBUG: Respond button clicked")
         msg_id       = data.get("message", {}).get("_id")
@@ -452,6 +449,15 @@ def query():
                 "text": "Please type your response to the student.",
                 "session_id": student_sess
             })
+    
+    # TA is typing their response
+    if conversation_history.get(session_id, {}).get("awaiting_ta_response"):
+        conversation_history[session_id]["awaiting_ta_response"] = False
+        forward_message_to_student(message, user, session_id)
+        return jsonify({
+            "text":       "✅ Your response has been forwarded to the student.",
+            "session_id": session_id
+        })
 
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
