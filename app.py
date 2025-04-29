@@ -151,7 +151,7 @@ def show_buttons(text, session_id, summary_button=False, followup_button=False):
                 "type": "button",
                 "text": "🎲 Generate Follow-up",
                 "msg": f"__FOLLOWUP__|{encoded}",
-                "msg_in_chat_window": True,
+                "msg_in_chat_window": False,
                 "msg_processing_type": "sendMessage"
             }]
         })
