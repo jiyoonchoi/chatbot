@@ -144,14 +144,13 @@ def show_buttons(text, session_id, summary_button=False, followup_button=False):
             }]
         })
     if followup_button:
-        # hide full context in `value`, echo only "generate_followup" in chat
+        # embed the last bot message after a special prefix
         encoded = text.replace("\n", "\\n").replace('"', '\\"')
         attachments.append({
             "actions": [{
                 "type": "button",
                 "text": "🎲 Generate Follow-up",
-                "msg": "generate_followup",
-                "value": encoded,
+                "msg": f"__FOLLOWUP__|{encoded}",
                 "msg_in_chat_window": True,
                 "msg_processing_type": "sendMessage"
             }]
