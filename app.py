@@ -450,7 +450,9 @@ def query():
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
 
-    if conversation_history[session_id].get("awaiting_ta_confirmation"):
+    # only handle the Yes/No confirmation when NOT already in a TA question flow
+    if conversation_history[session_id].get("awaiting_ta_confirmation") \
+       and not conversation_history[session_id].get("question_flow"):
         # if user directly picks a TA, clear confirmation and let the TA-flow handlers run
         if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
             conversation_history[session_id]["awaiting_ta_confirmation"] = False
