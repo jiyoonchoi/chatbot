@@ -608,7 +608,6 @@ def query():
         return jsonify(ta_button_response)
     
     if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
-        conversation_history[session_id].pop("awaiting_ta_confirmation", None)
         # User selected a TA to ask a question.
         ta_selected = ""
         if message == "ask_TA_Amanda":
