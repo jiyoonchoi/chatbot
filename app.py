@@ -499,12 +499,10 @@ def query():
                     }],
                     "session_id": session_id
                 })
-            elif message.lower() in ["no","n"] or choice in ["no","n"]:
+            else:
                 conversation_history[session_id]["awaiting_ta_confirmation"] = False
                 text = "✅ No problem! Let's keep exploring the paper."
                 return jsonify(show_buttons(text, session_id))
-            else:
-                return jsonify(show_buttons("❓ Please click Yes or No.", session_id))
 
     # Special admin commands
     if message.lower() == "clear_history":
