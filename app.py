@@ -440,7 +440,7 @@ def query():
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
         conversation_history[session_id].pop("last_followup_question", None)
-        text = "No worries! Let's continue whenever you're ready. 📚"
+        text = "No worries! Let's continue whenever you're ready. 📚\n Please ask another question about this week's reading!"
         conversation_history[session_id]["messages"].append(("bot", text))
         return jsonify(show_buttons(text, session_id))
 
