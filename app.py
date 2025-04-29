@@ -524,24 +524,24 @@ def query():
                     {
                         "actions": [
                             {
-                                "type": "button",
-                                "text": "✏️ Refine",
-                                "msg": "refine",
-                                "msg_in_chat_window": True,
+                                "type": "button", 
+                                "text": "✏️ Refine", 
+                                "msg": "refine", 
+                                "msg_in_chat_window": True, 
                                 "msg_processing_type": "sendMessage"
                             },
                             {
-                                "type": "button",
-                                "text": "✅ Send",
-                                "msg": "send",
-                                "msg_in_chat_window": True,
+                                "type": "button", 
+                                "text": "✅ Send",   
+                                "msg": "send",   
+                                "msg_in_chat_window": True, 
                                 "msg_processing_type": "sendMessage"
-                            }, 
+                            },
                             {
-                                "type": "button",
-                                "text": "❌ Cancel",
-                                "msg": "cancel",
-                                "msg_in_chat_window": True,
+                                "type": "button", 
+                                "text": "❌ Cancel", 
+                                "msg": "cancel", 
+                                "msg_in_chat_window": True, 
                                 "msg_processing_type": "sendMessage"
                             }
                         ]
