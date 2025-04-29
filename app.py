@@ -452,7 +452,8 @@ def query():
 
     if conversation_history[session_id].get("awaiting_ta_confirmation"):
         choice = (data.get("value") or "").lower()
-        if choice == "yes":
+        # treat a raw "ask_TA" text as "Yes"
+        if choice == "yes" or message == "ask_TA":
             conversation_history[session_id]["awaiting_ta_confirmation"] = False
 
             # Instead of starting question_flow immediately, SHOW TA selection buttons!
@@ -486,7 +487,7 @@ def query():
                 "session_id": session_id
             })
 
-        elif choice == "no":
+        elif choice == "no" or message.lower() == "no":
             conversation_history[session_id]["awaiting_ta_confirmation"] = False
             text = "✅ No problem! Let's keep exploring the paper."
             conversation_history[session_id]["messages"].append(("bot", text))
