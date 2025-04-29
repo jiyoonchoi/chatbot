@@ -478,29 +478,22 @@ def query():
         pdf_ready.pop(session_id, None)
 
     # only handle the Yes/No confirmation when NOT already in a TA question flow
-    if conversation_history[session_id].get("awaiting_ta_confirmation"):
-        # clear the flag immediately
-        conversation_history[session_id].pop("awaiting_ta_confirmation", None)
-
+        # only handle the Yes/No confirmation when NOT already in a TA flow
+    if conversation_history[session_id].pop("awaiting_ta_confirmation", None):
         if message.lower() in ("yes", "y"):
-            # start TA‐flow
-            ta_button_response = build_TA_button()
-            ta_button_response["session_id"] = session_id
-            return jsonify(ta_button_response)
+            resp = build_TA_button()
+            resp["session_id"] = session_id
+            return jsonify(resp)
         else:
             # fall back to answering from the PDF
             ensure_pdf_processed(session_id)
-            difficulty = classify_difficulty(message, session_id)
-            if difficulty == "factual":
-                answer = generate_response(
-                    "",
-                    f"Answer factually: {message}",
-                    session_id
-                )
+            diff = classify_difficulty(message, session_id)
+            if diff == "factual":
+                answer = generate_response("", f"Answer factually: {message}", session_id)
             else:
                 answer = generate_response(
                     "",
-                    f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}",
+                    f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper: {message}",
                     session_id
                 )
             conversation_history[session_id]["messages"].append(("bot", answer))
@@ -593,7 +586,7 @@ def query():
 
         return jsonify(show_buttons(feedback, session_id, followup_button=True))
 
-        
+
     # ----------------------------
     # TA Question Workflow
     # ----------------------------
