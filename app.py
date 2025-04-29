@@ -435,23 +435,35 @@ def query():
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
-    session_id = get_session_id(data)
+    session_id = data.get("session_id") or get_session_id(data)
 
     # ——————————————————————————————
     # Human‐TA “Respond to Student” handler
     # ——————————————————————————————
     if message.lower() == "respond":
-        # Rocket.Chat will include the original message’s _id in data["message"]["_id"]:
+        # Rocket.Chat will include the original student‐message _id in data["message"]["_id"]
         msg_id = data.get("message", {}).get("_id")
         student_session = ta_msg_to_student_session.get(msg_id)
         if student_session:
-            # flag that we’re awaiting the TA’s typed reply
+            # queue us up to read the next TA‐typed message as the answer
             conversation_history.setdefault(student_session, {"messages":[]})
             conversation_history[student_session]["awaiting_ta_response"] = True
+            # tell the TA to go ahead and type
             return jsonify({
                 "text": "Please type your response to the student.",
                 "session_id": student_session
             })
+    
+    # ————————————————————————
+    # TA is now typing their answer
+    # ————————————————————————
+    if conversation_history.get(session_id, {}).get("awaiting_ta_response"):
+        conversation_history[session_id]["awaiting_ta_response"] = False
+        forward_message_to_student(message, user, session_id)
+        return jsonify({
+            "text": "✅ Your response has been forwarded to the student.",
+            "session_id": session_id
+        })
 
     # ——————————————————————————————
     # TA‐flow: consume the first student question
@@ -774,15 +786,6 @@ def query():
     else:
         msg_id = None
    
-    if message == "respond":
-            # Process TA response prompt. For example, set flag and prompt for typed response.
-            print(data.get("text"))
-            conversation_history[student_session_id]["awaiting_ta_response"] = True
-            print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
-
-            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
-    
-    
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
