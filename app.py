@@ -458,7 +458,7 @@ def query():
         conversation_history[session_id]["awaiting_ta_response"] = False
         forward_message_to_student(message, user, session_id)
         return jsonify({
-            "text":       "✅ Your response has been forwarded to the student.",
+            "text": "✅ Your response has been forwarded to the student.",
             "session_id": session_id
         })
 
@@ -738,14 +738,6 @@ def query():
             return jsonify({"text": response, "session_id": session_id})
     else:
         msg_id = None
-
-    if message == "respond":
-            # Process TA response prompt. For example, set flag and prompt for typed response.
-            print(data.get("text"))
-            conversation_history[student_session_id]["awaiting_ta_response"] = True
-            print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
-
-            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
 
     # ----------------------------
     # End of TA Question Workflow
