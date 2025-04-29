@@ -451,10 +451,11 @@ def query():
         pdf_ready.pop(session_id, None)
 
     if conversation_history[session_id].get("awaiting_ta_confirmation"):
-        if message.lower() in ["yes", "y"]:
+        choice = (data.get("value") or "").lower()
+        if choice == "yes":
             conversation_history[session_id]["awaiting_ta_confirmation"] = False
 
-            # ⚡️ Instead of starting question_flow immediately, SHOW TA selection buttons!
+            # Instead of starting question_flow immediately, SHOW TA selection buttons!
             return jsonify({
                 "text": "👩‍🏫 Please select which TA you would like to ask:",
                 "attachments": [{
@@ -485,7 +486,7 @@ def query():
                 "session_id": session_id
             })
 
-        elif message.lower() in ["no", "n"]:
+        elif choice == "no":
             conversation_history[session_id]["awaiting_ta_confirmation"] = False
             text = "✅ No problem! Let's keep exploring the paper."
             conversation_history[session_id]["messages"].append(("bot", text))
@@ -897,14 +898,16 @@ def query():
                     {
                         "type": "button",
                         "text": "✅ Yes, Ask TA",
-                        "msg": "yes",
+                        "msg": "ask_TA",
+                        "value": "yes",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     },
                     {
                         "type": "button",
                         "text": "❌ No",
-                        "msg": "no",
+                        "msg": "ask_TA",
+                        "value": "no",
                         "msg_in_chat_window": True,
                         "msg_processing_type": "sendMessage"
                     }
