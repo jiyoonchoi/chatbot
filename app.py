@@ -435,7 +435,7 @@ def query():
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
-    session_id = get_session_id(data)
+    session_id = data.get("session_id") or get_session_id(data)
 
     # ────────────────────────────────
     # Human‐TA “Respond” button
