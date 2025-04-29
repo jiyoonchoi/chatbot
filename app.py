@@ -681,15 +681,6 @@ def query():
     else:
         msg_id = None
    
-    if message == "respond":
-            # Process TA response prompt. For example, set flag and prompt for typed response.
-            print(data.get("text"))
-            conversation_history[student_session_id]["awaiting_ta_response"] = True
-            print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
-
-            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
-    
-    
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
