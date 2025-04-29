@@ -437,6 +437,26 @@ def query():
 
     session_id = get_session_id(data)
 
+    # ——————————————————————————————
+    # TA‐flow: consume the first student question
+    # ——————————————————————————————
+    q_flow = conversation_history.get(session_id, {}).get("question_flow")
+    if q_flow and q_flow.get("state") == "awaiting_question":
+        q_flow["raw_question"] = message
+        q_flow["state"] = "awaiting_decision"
+        return jsonify({
+            "text": f'You typed: "{message}".\nWould you like to **refine** your question, **send** it as is, or **cancel**?',
+            "attachments": [{
+                "actions": [
+                    {"type":"button","text":"✏️ Refine","msg":"refine","msg_in_chat_window":True,"msg_processing_type":"sendMessage"},
+                    {"type":"button","text":"✅ Send","msg":"send","msg_in_chat_window":True,"msg_processing_type":"sendMessage"},
+                    {"type":"button","text":"❌ Cancel","msg":"cancel","msg_in_chat_window":True,"msg_processing_type":"sendMessage"}
+                ]
+            }],
+            "session_id": session_id
+        })
+
+
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
         conversation_history[session_id].pop("last_followup_question", None)
@@ -613,42 +633,7 @@ def query():
         state = q_flow.get("state", "")
         
         # State 1: Awaiting the initial question from the student.
-        if state == "awaiting_question":
-            # Save the raw question
-            q_flow["raw_question"] = message
-            # Ask whether to refine or send the question
-            q_flow["state"] = "awaiting_decision"
-            return jsonify({
-                "text": f"You typed: \"{message}\".\nWould you like to **refine** your question, **send** it as is, or **cancel**?",
-                "attachments": [
-                    {
-                        "actions": [
-                            {
-                                "type": "button",
-                                "text": "✏️ Refine",
-                                "msg": "refine",
-                                "msg_in_chat_window": True,
-                                "msg_processing_type": "sendMessage"
-                            },
-                            {
-                                "type": "button",
-                                "text": "✅ Send",
-                                "msg": "send",
-                                "msg_in_chat_window": True,
-                                "msg_processing_type": "sendMessage"
-                            }, 
-                            {
-                                "type": "button",
-                                "text": "❌ Cancel",
-                                "msg": "cancel",
-                                "msg_in_chat_window": True,
-                                "msg_processing_type": "sendMessage"
-                            }
-                        ]
-                    }
-                ],
-                "session_id": session_id
-            })
+        # logic exists further up after getting session_id
         
         # State 2: Awaiting decision from student on whether to refine or send
         if state == "awaiting_decision":
