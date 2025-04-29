@@ -470,123 +470,7 @@ def query():
         text = "No worries! Let's continue whenever you're ready. 📚\n Please ask another question about this week's reading!"
         conversation_history[session_id]["messages"].append(("bot", text))
         return jsonify(show_buttons(text, session_id))
-
-    if session_id not in conversation_history:
-        conversation_history[session_id] = {"messages": []}
-        summary_cache.pop(session_id, None)
-        processed_pdf.pop(session_id, None)
-        pdf_ready.pop(session_id, None)
-
-    # only handle the Yes/No confirmation when NOT already in a TA question flow
-        # only handle the Yes/No confirmation when NOT already in a TA flow
-    if conversation_history[session_id].pop("awaiting_ta_confirmation", None):
-        if message.lower() in ("yes", "y"):
-            resp = build_TA_button()
-            resp["session_id"] = session_id
-            return jsonify(resp)
-        else:
-            # fall back to answering from the PDF
-            ensure_pdf_processed(session_id)
-            diff = classify_difficulty(message, session_id)
-            if diff == "factual":
-                answer = generate_response("", f"Answer factually: {message}", session_id)
-            else:
-                answer = generate_response(
-                    "",
-                    f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper: {message}",
-                    session_id
-                )
-            conversation_history[session_id]["messages"].append(("bot", answer))
-            return jsonify(show_buttons(answer, session_id, followup_button=True))
     
-    # Special admin commands
-    if message.lower() == "clear_history":
-        conversation_history.pop(session_id, None)
-        summary_cache.pop(session_id, None)
-        processed_pdf.pop(session_id, None)
-        pdf_ready.pop(session_id, None)
-        return jsonify(show_buttons("✅ History and caches cleared.", session_id))
-
-    if message.lower() == "summarize":
-        if not ensure_pdf_processed(session_id):
-            return jsonify(show_buttons("PDF not processed yet. Please try again shortly.", session_id))
-        summary = generate_response("", "Summarize the uploaded paper in 3-4 sentences.", session_id)
-        summary_cache[session_id] = summary
-        return jsonify(show_buttons(summary, session_id))
-
-
-    # ----------------------------
-    # Follow-up Question Workflow
-    # ----------------------------
-    if message.startswith("__FOLLOWUP__|") or message.lower() == "generate_followup":
-        # decode last-bot override if present
-        override = None
-        if message.startswith("__FOLLOWUP__|"):
-            _, raw = message.split("|", 1)
-            override = raw.replace("\\n", "\n").replace('\\"', '"')
-
-        followup = generate_followup(session_id, override_last_bot=override)
-        conversation_history[session_id]["awaiting_followup_response"] = True
-        conversation_history[session_id]["last_followup_question"] = followup
-        conversation_history[session_id]["messages"].append(("bot", followup))
-        return jsonify({
-            "text": f"🧐 Follow-up:\n\n{followup}\n\nPlease reply with your thoughts!",
-            "session_id": session_id,
-            "attachments": [{
-                "actions": [{
-                    "type": "button",
-                    "text": "❌ Skip",
-                    "msg": "skip_followup",
-                    "msg_in_chat_window": True,
-                    "msg_processing_type": "sendMessage"
-                }]
-            }]
-        })
-    if message.lower() == "generate_followup":
-        # rocket.chat will include the button's "value" field in payload
-        override = data.get("value")
-        followup = generate_followup(session_id, override)
-
-        if followup:
-            conversation_history[session_id]["awaiting_followup_response"] = True
-            conversation_history[session_id]["last_followup_question"] = followup
-            conversation_history[session_id]["messages"].append(("bot", followup))
-            return jsonify({
-                "text": f"🧐 Follow-up:\n\n{followup}\n\nPlease reply with your thoughts!",
-                "session_id": session_id,
-                "attachments": [{"actions": [{"type": "button", "text": "❌ Skip", "msg": "skip_followup", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}]}]
-            })
-
-    cmds = {"summarize", "generate_followup", "clear_history"}
-
-    if conversation_history[session_id].get("awaiting_followup_response") and message.lower() not in cmds:
-        last_followup = conversation_history[session_id].get("last_followup_question", "")
-
-        grading_prompt = (
-            f"Original follow-up question:\n\n"
-            f"\"{last_followup}\"\n\n"
-            f"Student's response:\n\n"
-            f"\"{message}\"\n\n"
-            "Consider the following 2 cases and keep response concise, encouraging, and related to the uploaded paper:\n"
-            "Case 1: If the original follow-up question prompts a concrete answer, evaluate the student's response:\n"
-            "- If correct or mostly correct, confirm warmly and optionally elaborate briefly.\n"
-            "- If partially correct, point out missing parts politely.\n"
-            "- If wrong, gently correct them and guide them where to look in the paper.\n"
-            "Case 2: If the original follow-up question is vague or open-ended, evaluate the student's response:\n"
-            "- If the student provides a concrete answer, confirm warmly and optionally elaborate briefly.\n"
-            "- If the student provides a vague or open-ended answer, gently correct them and guide them where to look in the paper.\n\n"
-        )
-
-        feedback = generate_response("", grading_prompt, session_id)
-        conversation_history[session_id]["messages"].append(("bot", feedback))
-
-        # AFTER generating feedback, then clear flags
-        conversation_history[session_id]["awaiting_followup_response"] = False
-        conversation_history[session_id].pop("last_followup_question", None)
-
-        return jsonify(show_buttons(feedback, session_id, followup_button=True))
-
-
     # ----------------------------
     # TA Question Workflow
     # ----------------------------
@@ -717,6 +601,121 @@ def query():
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
+
+    if session_id not in conversation_history:
+        conversation_history[session_id] = {"messages": []}
+        summary_cache.pop(session_id, None)
+        processed_pdf.pop(session_id, None)
+        pdf_ready.pop(session_id, None)
+
+    # only handle the Yes/No confirmation when NOT already in a TA question flow
+        # only handle the Yes/No confirmation when NOT already in a TA flow
+    if conversation_history[session_id].pop("awaiting_ta_confirmation", None):
+        if message.lower() in ("yes", "y"):
+            resp = build_TA_button()
+            resp["session_id"] = session_id
+            return jsonify(resp)
+        else:
+            # fall back to answering from the PDF
+            ensure_pdf_processed(session_id)
+            diff = classify_difficulty(message, session_id)
+            if diff == "factual":
+                answer = generate_response("", f"Answer factually: {message}", session_id)
+            else:
+                answer = generate_response(
+                    "",
+                    f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper: {message}",
+                    session_id
+                )
+            conversation_history[session_id]["messages"].append(("bot", answer))
+            return jsonify(show_buttons(answer, session_id, followup_button=True))
+    
+    # Special admin commands
+    if message.lower() == "clear_history":
+        conversation_history.pop(session_id, None)
+        summary_cache.pop(session_id, None)
+        processed_pdf.pop(session_id, None)
+        pdf_ready.pop(session_id, None)
+        return jsonify(show_buttons("✅ History and caches cleared.", session_id))
+
+    if message.lower() == "summarize":
+        if not ensure_pdf_processed(session_id):
+            return jsonify(show_buttons("PDF not processed yet. Please try again shortly.", session_id))
+        summary = generate_response("", "Summarize the uploaded paper in 3-4 sentences.", session_id)
+        summary_cache[session_id] = summary
+        return jsonify(show_buttons(summary, session_id))
+
+
+    # ----------------------------
+    # Follow-up Question Workflow
+    # ----------------------------
+    if message.startswith("__FOLLOWUP__|") or message.lower() == "generate_followup":
+        # decode last-bot override if present
+        override = None
+        if message.startswith("__FOLLOWUP__|"):
+            _, raw = message.split("|", 1)
+            override = raw.replace("\\n", "\n").replace('\\"', '"')
+
+        followup = generate_followup(session_id, override_last_bot=override)
+        conversation_history[session_id]["awaiting_followup_response"] = True
+        conversation_history[session_id]["last_followup_question"] = followup
+        conversation_history[session_id]["messages"].append(("bot", followup))
+        return jsonify({
+            "text": f"🧐 Follow-up:\n\n{followup}\n\nPlease reply with your thoughts!",
+            "session_id": session_id,
+            "attachments": [{
+                "actions": [{
+                    "type": "button",
+                    "text": "❌ Skip",
+                    "msg": "skip_followup",
+                    "msg_in_chat_window": True,
+                    "msg_processing_type": "sendMessage"
+                }]
+            }]
+        })
+    if message.lower() == "generate_followup":
+        # rocket.chat will include the button's "value" field in payload
+        override = data.get("value")
+        followup = generate_followup(session_id, override)
+
+        if followup:
+            conversation_history[session_id]["awaiting_followup_response"] = True
+            conversation_history[session_id]["last_followup_question"] = followup
+            conversation_history[session_id]["messages"].append(("bot", followup))
+            return jsonify({
+                "text": f"🧐 Follow-up:\n\n{followup}\n\nPlease reply with your thoughts!",
+                "session_id": session_id,
+                "attachments": [{"actions": [{"type": "button", "text": "❌ Skip", "msg": "skip_followup", "msg_in_chat_window": True, "msg_processing_type": "sendMessage"}]}]
+            })
+
+    cmds = {"summarize", "generate_followup", "clear_history"}
+
+    if conversation_history[session_id].get("awaiting_followup_response") and message.lower() not in cmds:
+        last_followup = conversation_history[session_id].get("last_followup_question", "")
+
+        grading_prompt = (
+            f"Original follow-up question:\n\n"
+            f"\"{last_followup}\"\n\n"
+            f"Student's response:\n\n"
+            f"\"{message}\"\n\n"
+            "Consider the following 2 cases and keep response concise, encouraging, and related to the uploaded paper:\n"
+            "Case 1: If the original follow-up question prompts a concrete answer, evaluate the student's response:\n"
+            "- If correct or mostly correct, confirm warmly and optionally elaborate briefly.\n"
+            "- If partially correct, point out missing parts politely.\n"
+            "- If wrong, gently correct them and guide them where to look in the paper.\n"
+            "Case 2: If the original follow-up question is vague or open-ended, evaluate the student's response:\n"
+            "- If the student provides a concrete answer, confirm warmly and optionally elaborate briefly.\n"
+            "- If the student provides a vague or open-ended answer, gently correct them and guide them where to look in the paper.\n\n"
+        )
+
+        feedback = generate_response("", grading_prompt, session_id)
+        conversation_history[session_id]["messages"].append(("bot", feedback))
+
+        # AFTER generating feedback, then clear flags
+        conversation_history[session_id]["awaiting_followup_response"] = False
+        conversation_history[session_id].pop("last_followup_question", None)
+
+        return jsonify(show_buttons(feedback, session_id, followup_button=True))
             
     # Process normal message
     conversation_history[session_id]["messages"].append(("user", message))
