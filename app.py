@@ -432,22 +432,23 @@ def query():
     user = data.get("user_name", "Unknown")
     message = data.get("text", "").strip()
 
+    session_id = data.get("session_id") or get_session_id(data)
+
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
-
-    session_id = data.get("session_id") or get_session_id(data)
 
     # ────────────────────────────────
     # Human‐TA “Respond” button
     # ────────────────────────────────
     if message.lower() == "respond":
+        print("DEBUG: Respond button clicked")
         msg_id       = data.get("message", {}).get("_id")
         student_sess = ta_msg_to_student_session.get(msg_id)
         if student_sess:
             conversation_history.setdefault(student_sess, {"messages":[]})
             conversation_history[student_sess]["awaiting_ta_response"] = True
             return jsonify({
-                "text":       "Please type your response to the student.",
+                "text": "Please type your response to the student.",
                 "session_id": student_sess
             })
 
@@ -461,20 +462,6 @@ def query():
             "text": "✅ Your response has been forwarded to the student.",
             "session_id": session_id
         })
-
-    # ────────────────────────────────
-    # ask_TA flow (exactly as in old code)
-    # ────────────────────────────────
-    if message == "ask_TA":
-        # reset any previous TA-question state
-        conversation_history[session_id].pop("student_question", None)
-        conversation_history[session_id].pop("suggested_question", None)
-        conversation_history[session_id].pop("final_question", None)
-
-        payload = build_TA_button()  # same as old
-        payload["session_id"] = session_id
-        return jsonify(payload)
-
 
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
@@ -609,7 +596,6 @@ def query():
     # ----------------------------
     # TA Question Workflow
     # ----------------------------
-
     if message == "ask_TA": 
         conversation_history[session_id].pop("student_question", None)
         conversation_history[session_id].pop("suggested_question", None)
