@@ -453,17 +453,6 @@ def query():
                 "session_id": student_sess
             })
 
-    # ────────────────────────────────
-    # TA is now typing their answer
-    # ────────────────────────────────
-    if conversation_history.get(session_id, {}).get("awaiting_ta_response"):
-        conversation_history[session_id]["awaiting_ta_response"] = False
-        forward_message_to_student(message, user, session_id)
-        return jsonify({
-            "text": "✅ Your response has been forwarded to the student.",
-            "session_id": session_id
-        })
-
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
         conversation_history[session_id].pop("last_followup_question", None)
@@ -704,29 +693,25 @@ def query():
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
-
-    # only handle the Yes/No confirmation when NOT already in a TA question flow
-    if conversation_history[session_id].pop("awaiting_ta_confirmation", False):
-        # “Yes” or “Ask TA” → start the TA flow
-        if message.lower() in ("yes", "y") or message == "ask_TA":
-            resp = build_TA_button()
-            resp["session_id"] = session_id
-            return jsonify(resp)
-        # “No” → fallback to a paper‐based answer
-        ensure_pdf_processed(session_id)
-        difficulty = classify_difficulty(message, session_id)
-        if difficulty == "factual":
-            answer = generate_response(
-                "", f"Answer factually: {message}", session_id
-            )
+    if conversation_history[session_id].get("awaiting_ta_confirmation"):
+        if message.lower() in ["yes", "y"]:
+            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
+            # Then start the TA question flow: show TA selection (or directly send if a default TA is used)
+            ta_button_response = build_TA_button()  # reuse your TA button builder
+            ta_button_response["session_id"] = session_id
+            return jsonify(ta_button_response)
         else:
+            conversation_history[session_id].pop("awaiting_ta_confirmation", None)
+            # Fall back to answering the question using the document context
             answer = generate_response(
-                "", 
-                f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}", 
+                "",
+                f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}",
                 session_id
             )
-        conversation_history[session_id]["messages"].append(("bot", answer))
-        return jsonify(show_buttons(answer, session_id, followup_button=True))
+            conversation_history[session_id]["messages"].append(("bot", answer))
+            # Optionally add a follow-up prompt here
+            return jsonify(show_buttons(answer, session_id))
+
     
     # Special admin commands
     if message.lower() == "clear_history":
