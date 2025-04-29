@@ -478,32 +478,34 @@ def query():
         pdf_ready.pop(session_id, None)
 
     # only handle the Yes/No confirmation when NOT already in a TA question flow
-    if conversation_history[session_id].get("awaiting_ta_confirmation") \
-       and not conversation_history[session_id].get("question_flow"):
-        # if user directly picks a TA, clear confirmation and let the TA-flow handlers run
-        if message in ["ask_TA_Aya", "ask_TA_Jiyoon", "ask_TA_Amanda"]:
-            conversation_history[session_id]["awaiting_ta_confirmation"] = False
-            # fall through into the TA question workflow below
-        else:
-            choice = (data.get("value") or "").lower()
-            if message.lower() in ["yes","y"] or choice in ["yes","y"] or message == "ask_TA":
-                conversation_history[session_id]["awaiting_ta_confirmation"] = False
-                return jsonify({
-                    "text": "👩‍🏫 Please select which TA you would like to ask:",
-                    "attachments": [{
-                        "actions": [
-                            { "type":"button","text":"Ask TA Aya","msg":"ask_TA_Aya","msg_in_chat_window":True,"msg_processing_type":"sendMessage" },
-                            { "type":"button","text":"Ask TA Jiyoon","msg":"ask_TA_Jiyoon","msg_in_chat_window":True,"msg_processing_type":"sendMessage" },
-                            { "type":"button","text":"Ask TA Amanda","msg":"ask_TA_Amanda","msg_in_chat_window":True,"msg_processing_type":"sendMessage" }
-                        ]
-                    }],
-                    "session_id": session_id
-                })
-            else:
-                conversation_history[session_id]["awaiting_ta_confirmation"] = False
-                text = "✅ No problem! Let's keep exploring the paper."
-                return jsonify(show_buttons(text, session_id))
+    if conversation_history[session_id].get("awaiting_ta_confirmation"):
+        # clear the flag immediately
+        conversation_history[session_id].pop("awaiting_ta_confirmation", None)
 
+        if message.lower() in ("yes", "y"):
+            # start TA‐flow
+            ta_button_response = build_TA_button()
+            ta_button_response["session_id"] = session_id
+            return jsonify(ta_button_response)
+        else:
+            # fall back to answering from the PDF
+            ensure_pdf_processed(session_id)
+            difficulty = classify_difficulty(message, session_id)
+            if difficulty == "factual":
+                answer = generate_response(
+                    "",
+                    f"Answer factually: {message}",
+                    session_id
+                )
+            else:
+                answer = generate_response(
+                    "",
+                    f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}",
+                    session_id
+                )
+            conversation_history[session_id]["messages"].append(("bot", answer))
+            return jsonify(show_buttons(answer, session_id, followup_button=True))
+    
     # Special admin commands
     if message.lower() == "clear_history":
         conversation_history.pop(session_id, None)
