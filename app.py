@@ -100,6 +100,21 @@ def classify_difficulty(question, session_id):
     difficulty = generate_response("", prompt, session_id).lower()
     return "factual" if "factual" in difficulty else "conceptual"
 
+def classify_specificity(question: str, session_id: str) -> str:
+    """
+    Use the LLM to classify a question as 'general' or 'specific'.
+    """
+    prompt = (
+        "Classify the following question based on how specific it is:\n\n"
+        "- 'specific' → if it refers to a particular phase, detail, result, reason, or comparison in the paper.\n"
+        "- 'general' → if it's broad, high-level, or asking about the overall topic or methods.\n\n"
+        f"Question: \"{question}\"\n\n"
+        "Respond with only one word: 'specific' or 'general'."
+    )
+    response = generate_response("", prompt, session_id)
+    return response.strip().lower()
+
+
 def generate_followup(session_id, override_last_bot=None):
     if override_last_bot:
         last_bot_message = override_last_bot
@@ -858,14 +873,34 @@ def query():
             answer = answer["response"].strip() if isinstance(answer, dict) else answer.strip()
         else:
             # Normal factual vs conceptual answering
-            if difficulty == "factual":
-                answer = generate_response("", f"Answer factually: {message}", session_id)
-            else:
+            # if difficulty == "factual":
+            #     answer = generate_response("", f"Answer factually: {message}", session_id)
+            # else:
+            #     answer = generate_response(
+            #         "", 
+            #         f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}", 
+            #         session_id
+            #     )
+            specificity = classify_specificity(message, session_id)
+
+            if specificity == "general":
                 answer = generate_response(
                     "", 
-                    f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}", 
+                    f"The question is general. Give a short teaser or hint about which section might contain the answer, "
+                    "but avoid giving a detailed explanation. Encourage the user to explore the paper directly.", 
                     session_id
                 )
+            else:
+                if difficulty == "factual":
+                    answer = generate_response("", f"Answer factually: {message}", session_id)
+                else:
+                    answer = generate_response(
+                        "", 
+                        f"Answer this conceptual question in 1–2 sentences based on the paper. "
+                        "Only include information you are confident is accurate.", 
+                        session_id
+                    )
+
 
         conversation_history[session_id]["messages"].append(("bot", answer))
         return jsonify(show_buttons(answer, session_id, followup_button=True))
