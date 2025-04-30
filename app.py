@@ -884,6 +884,7 @@ def query():
             specificity = classify_specificity(message, session_id)
 
             if specificity == "general":
+                print("DEBUG: Generating Elusive response about Paper...")
                 answer = generate_response(
                     "", 
                     f"The question is general. Give a one sentence teaser or hint about which section might contain the answer, "
