@@ -889,13 +889,15 @@ def query():
                     "", 
                     f"The question is general. Give a one sentence teaser or hint about which section might contain the answer, "
                     "but avoid giving a detailed explanation. Encourage the user to explore the paper directly and "
-                    "please bold the specific section of the paper to refer to.", 
+                    "please bold the specific section of the paper to refer to using Markdown (**like this**).", 
                     session_id
                 )
             else:
                 if difficulty == "factual":
+                    print("DEBUG: Generating Factual response about Paper...")
                     answer = generate_response("", f"Answer factually: {message}", session_id)
                 else:
+                    print("DEBUG: Generating Detailed response about Paper...")
                     answer = generate_response(
                         "", 
                         f"Answer this conceptual question in 1–2 sentences based on the paper. "
