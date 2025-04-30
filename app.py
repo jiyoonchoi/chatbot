@@ -886,8 +886,9 @@ def query():
             if specificity == "general":
                 answer = generate_response(
                     "", 
-                    f"The question is general. Give a short teaser or hint about which section might contain the answer, "
-                    "but avoid giving a detailed explanation. Encourage the user to explore the paper directly.", 
+                    f"The question is general. Give a one sentence teaser or hint about which section might contain the answer, "
+                    "but avoid giving a detailed explanation. Encourage the user to explore the paper directly. "
+                    "Please bold the section of the paper to refer to.", 
                     session_id
                 )
             else:
