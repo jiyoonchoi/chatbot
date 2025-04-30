@@ -887,8 +887,8 @@ def query():
                 answer = generate_response(
                     "", 
                     f"The question is general. Give a one sentence teaser or hint about which section might contain the answer, "
-                    "but avoid giving a detailed explanation. Encourage the user to explore the paper directly. "
-                    "Please bold the section of the paper to refer to.", 
+                    "but avoid giving a detailed explanation. Encourage the user to explore the paper directly and "
+                    "please bold the specific section of the paper to refer to.", 
                     session_id
                 )
             else:
