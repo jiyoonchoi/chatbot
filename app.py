@@ -825,7 +825,7 @@ def query():
             "I'll guide you to the key sections and ask thought-provoking questions—but I won't just hand you the answers. 🤫\n\n"
             f"**{intro}**\n\n"
             "If there's a question I can't fully answer, I'll prompt you to forward it to your TA. "
-            "Please ask a question about the paper now or click one of the buttons below!"
+            "Please ask a question about the paper now or click one of the buttons below! "
             "You have two buttons to choose from:\n"
             "- 📄 **Quick Summary** - Get a concise 3-4 sentence overview of the paper's main objectives and findings.\n"
             "- 🧑‍🏫 **Ask TA** - Send your question to a human TA if you'd like extra help.\n\n"
@@ -835,6 +835,7 @@ def query():
         return jsonify(show_buttons(greeting_msg, session_id, summary_button=True))
 
     if classification == "content_about_paper":
+        specificity = classify_specificity(message, session_id)
         difficulty = classify_difficulty(message, session_id)
         ensure_pdf_processed(session_id)
 
@@ -881,7 +882,6 @@ def query():
             #         f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}", 
             #         session_id
             #     )
-            specificity = classify_specificity(message, session_id)
 
             if specificity == "general":
                 print("DEBUG: Generating Elusive response about Paper...")
