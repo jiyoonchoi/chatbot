@@ -380,6 +380,7 @@ def generate_suggested_question(session_id, student_question, feedback=None):
          result = response.get('response', '').strip()
     else:
          result = response.strip()
+         
     # Optionally extract a quoted sentence if present
     match = re.search(r'"(.*?)"', result)
     suggested_question_clean = match.group(1) if match else result
