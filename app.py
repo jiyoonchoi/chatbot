@@ -107,7 +107,8 @@ def classify_specificity(question: str, session_id: str) -> str:
     prompt = (
         "Classify the following question based on how specific it is:\n\n"
         "- 'specific' → if it refers to a particular phase, detail, result, reason, or comparison in the paper.\n"
-        "- 'general' → if it's broad, high-level, or asking about the overall topic or methods.\n\n"
+        "- 'general' → if it's broad, high-level, about an entire section (introduction, literature review, methodology, data collection, results, conclusion, etc)"
+        " or asking about the overall topic or methods.\n\n"
         f"Question: \"{question}\"\n\n"
         "Respond with only one word: 'specific' or 'general'."
     )
