@@ -112,6 +112,7 @@ def classify_specificity(question: str, session_id: str) -> str:
         "Respond with only one word: 'specific' or 'general'."
     )
     response = generate_response("", prompt, session_id)
+    print(f"DEBUG: Specificity classifed as: ", response)
     return response.strip().lower()
 
 
