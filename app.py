@@ -758,7 +758,7 @@ def query():
     # ----------------------------
     # Follow-up Question Workflow
     # ----------------------------
-    if message.startswith("__FOLLOWUP__|") or message.lower() == "generate_followup":
+    if message.startswith("__FOLLOWUP__ | ") or message.lower() == "generate_followup":
         # decode last-bot override if present
         override = None
         if message.startswith("__FOLLOWUP__|"):
