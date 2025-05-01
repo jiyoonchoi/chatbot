@@ -70,6 +70,9 @@ def generate_response(system, prompt, session_id):
                         lastk=5, rag_usage=True, rag_threshold=0.01, rag_k=10)
                         #  lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
 
+    print("DEBUG: Retrieved Chunks:", response["sources"])
+
+
     if isinstance(response, dict):
         return response.get("response", "").strip()
     return response.strip()
