@@ -445,41 +445,6 @@ def generate_suggested_question(session_id, student_question, feedback=None):
     print("END OF SUGGESTED QUESTION")
     return result, suggested_question_clean
 
-
-def send_direct_message_to_TA(question, session_id, ta_username):
-    """
-    Send a direct message to the TA using Rocket.Chat API.
-    """
-    headers = {
-        "Content-Type": "application/json",
-        "X-Auth-Token": BOT_AUTH_TOKEN,
-        "X-User-Id": BOT_USER_ID,
-    }
-    message_text = f"Student '{session_id}' asks:\n\n{question}"
-    payload = {
-        "channel": f"@{ta_username}",
-        "text": message_text,
-        "attachments": [
-            {
-                "actions": [
-                    {
-                        "type": "button",
-                        "text": "Respond to Student",
-                        "msg": "respond",
-                        "msg_in_chat_window": True,
-                        "msg_processing_type": "sendMessage"
-                    }
-                ]
-            }
-        ]
-    }
-    try:
-        response = requests.post(MSG_ENDPOINT, json=payload, headers=headers)
-        response.raise_for_status()
-        print(f"✅ Successfully sent question to TA {ta_username}")
-    except Exception as e:
-        print(f"🚨 Failed to send message to TA {ta_username}: {e}")
-
 # ------------------------------------------------------------------------
 # Flask Route
 # ------------------------------------------------------------------------
