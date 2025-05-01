@@ -890,9 +890,9 @@ def query():
                 print("DEBUG: Generating Elusive response about Paper...")
                 answer = generate_response(
                     "", 
-                    f"The question is general. Give a one sentence teaser or hint about which section might contain the answer, "
-                    "but avoid giving a detailed explanation. Then, encourage the user to explore the paper directly and "
-                    "please bold the specific section of the paper to refer to using Markdown (**like this**).", 
+                    f"Give a one sentence teaser or hint of the answer to the question, but avoid giving a detailed explanation. "
+                    "Then, encourage the user to explore the paper directly and "
+                    "please bold the section of the paper to refer to using Markdown (**like this**).", 
                     session_id
                 )
             else:
