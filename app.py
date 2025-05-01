@@ -465,37 +465,17 @@ def query():
     # ────────────────────────────────
     if message.lower() == "respond":
         print("DEBUG: Respond button clicked")
-        print("DEBUG: full payload:", data)
-
-        # 1) pull the message _id out of the top‐level message_id
-        msg_id = data.get("message_id")
-        print(f"DEBUG: extracted msg_id -> {msg_id!r}")
-
-        # 2) look up which student session that maps to
+        msg_id       = data.get("message", {}).get("_id")
         student_sess = ta_msg_to_student_session.get(msg_id)
-        print(f"DEBUG: ta_msg_to_student_session[{msg_id!r}] -> {student_sess!r}")
-
-        if not student_sess:
-            # (optionally) try falling back to the room id if you also stored that:
-            chan_id = data.get("channel_id")
-            print(f"DEBUG: no mapping for msg_id, trying channel_id -> {chan_id!r}")
-            student_sess = ta_msg_to_student_session.get(chan_id)
-            print(f"DEBUG: ta_msg_to_student_session[{chan_id!r}] -> {student_sess!r}")
-
-        if not student_sess:
-            print(f"DEBUG: still no mapping → ignoring")
-            return jsonify({"status": "ignored"})
-
-        # 3) set up the student session and flag
-        print(f"DEBUG: Responding to student session {student_sess}")
-        conversation_history.setdefault(student_sess, {"messages": [], "awaiting_ta_response": False})
-        conversation_history[student_sess]["awaiting_ta_response"] = True
-
-        # 4) prompt *this* TA session to type the answer
-        return jsonify({
-            "text": "Please type your response to the student.",
-            "session_id": student_sess
-        })
+        print("student_sess: ", student_sess)
+        if student_sess:
+            print(f"DEBUG: Responding to student session {student_sess}")
+            conversation_history.setdefault(student_sess, {"messages":[]})
+            conversation_history[student_sess]["awaiting_ta_response"] = True
+            return jsonify({
+                "text": "Please type your response to the student.",
+                "session_id": student_sess
+            })
 
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
