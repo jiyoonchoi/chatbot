@@ -105,12 +105,13 @@ def classify_specificity(question: str, session_id: str) -> str:
     Use the LLM to classify a question as 'general' or 'specific'.
     """
     prompt = (
-        "Classify the following question based on how specific it is:\n\n"
-        "- 'specific' → if it refers to a particular phase, detail, result, reason, or comparison in the paper.\n"
-        "- 'general' → if it's broad, high-level, about an entire section (introduction, literature review, methodology, data collection, results, conclusion, etc)"
-        " or asking about the overall topic or methods.\n\n"
+        "Classify the following question based on its intent:\n\n"
+        "- 'asking_for_details' → if the user is trying to understand a topic, section, or process in the paper that they likely don't know yet. "
+        "These questions are broad, open-ended, or exploratory.\n"
+        "- 'confirming_understanding' → if the user is checking whether something they believe or suspect is correct based on the paper. "
+        "These questions are often yes/no, comparative, or reflect partial understanding.\n\n"
         f"Question: \"{question}\"\n\n"
-        "Respond with only one word: 'specific' or 'general'."
+        "Respond with only one word: 'asking_for_details' or 'confirming_understanding'."
     )
     response = generate_response("", prompt, session_id)
     print(f"DEBUG: Specificity classifed as: ", response)
