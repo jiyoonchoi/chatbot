@@ -751,7 +751,7 @@ def query():
             return jsonify(resp)
         # “No” → fallback to a paper‐based answer
         ensure_pdf_processed(session_id)
-        difficulty = classify_difficulty(message, session_id)
+        # difficulty = classify_difficulty(message, session_id)
         if difficulty == "factual":
             answer = generate_response(
                 "", f"Answer factually: {message}", session_id
@@ -918,7 +918,7 @@ def query():
             )
             answer = answer["response"].strip() if isinstance(answer, dict) else answer.strip()
         else:
-            specificity = classify_specificity(message, session_id)
+            # specificity = classify_specificity(message, session_id)
             
             if specificity == "asking_for_details":
                 print("DEBUG: Generating Elusive response about Paper...")
@@ -931,7 +931,7 @@ def query():
                 )
                 
             else:
-                difficulty = classify_difficulty(message, session_id)
+                # difficulty = classify_difficulty(message, session_id)
                 if difficulty == "factual":
                     print("DEBUG: Generating Factual response about Paper...")
                     answer = generate_paper_response("", f"Answer factually: {message}", session_id)
