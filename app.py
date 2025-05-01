@@ -904,7 +904,7 @@ def query():
                     answer = generate_response(
                         "", 
                         f"Confirm if their understanding is correct. "
-                        "Then, respond with the correct answer of this conceptual question in 1–2 sentences based on the paper. "
+                        "Then, respond with the correct answer of this conceptual question in 2-3 sentences based on the paper. "
                         "Only include information you are confident is accurate.", 
                         session_id
                     )
