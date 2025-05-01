@@ -66,7 +66,7 @@ def generate_response(system, prompt, session_id):
     if not system:
         system = ("You are a TA chatbot for CS-150. Answer only based on the uploaded paper. "
                   "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
-    response = generate(model='us.anthropic.claude-3-haiku-20240307-v1:0', system=system, query=prompt, session_id=session_id, temperature=0.0,
+    response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
                         lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
 
     if isinstance(response, dict):
@@ -77,7 +77,7 @@ def generate_paper_response(system, prompt, session_id):
     if not system:
         system = ("You are a TA chatbot for CS-150. Answer only based on the uploaded paper. "
                   "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
-    response = generate(model='us.anthropic.claude-3-haiku-20240307-v1:0', system=system, query=prompt, session_id=session_id, temperature=0.0,
+    response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
                         lastk=5, rag_usage=True, rag_threshold=0.01, rag_k=10)
 
     if isinstance(response, dict):
@@ -392,7 +392,7 @@ def generate_suggested_question(session_id, student_question, feedback=None):
         )
 
     response = generate(
-            model='us.anthropic.claude-3-haiku-20240307-v1:0',
+            model='4o-mini',
             system=(
                 "You are a TA chatbot for CS-150: Generative AI for Social Impact. "
                 "Rephrase or refine the student's question to be clearer and more comprehensive, "
@@ -877,7 +877,7 @@ def query():
                 "If the information is unclear, say so politely."
             )
             answer = generate(
-                model='us.anthropic.claude-3-haiku-20240307-v1:0',
+                model='4o-mini',
                 system=system_prompt,
                 query=prompt,
                 session_id=session_id,
