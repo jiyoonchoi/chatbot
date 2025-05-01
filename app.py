@@ -144,6 +144,7 @@ def generate_followup(session_id, override_last_bot=None):
         return ("I need a little context first — ask me something about "
                 "the paper, then press **Get a Follow-up Question**! 😊")
 
+    print(f"DEBUG: creating followup question \n")
     prompt = (
         f"You are acting as a TA chatbot helping a student think critically about a research paper.\n\n"
         f"Based on the last response you gave:\n\n"
