@@ -891,7 +891,7 @@ def query():
                 answer = generate_response(
                     "", 
                     f"The question is general. Give a one sentence teaser or hint about which section might contain the answer, "
-                    "but avoid giving a detailed explanation. Encourage the user to explore the paper directly and "
+                    "but avoid giving a detailed explanation. Then, encourage the user to explore the paper directly and "
                     "please bold the specific section of the paper to refer to using Markdown (**like this**).", 
                     session_id
                 )
@@ -903,7 +903,8 @@ def query():
                     print("DEBUG: Generating Detailed response about Paper...")
                     answer = generate_response(
                         "", 
-                        f"Answer this conceptual question in 1–2 sentences based on the paper. "
+                        f"Confirm if their understanding is correct, or partially correct. "
+                        "Then, respond with the correct answer of this conceptual question in 1–2 sentences based on the paper. "
                         "Only include information you are confident is accurate.", 
                         session_id
                     )
