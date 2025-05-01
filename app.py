@@ -292,11 +292,15 @@ def send_direct_message_to_TA(question, session_id, ta_username):
         print("DEBUG: Direct message sent:", resp_data)
         # Extract the unique message _id returned from Rocket.Chat:
         if resp_data.get("success") and "message" in resp_data:
-            message_id = resp_data["message"].get("_id")
+            m = resp_data["message"]
+            message_id = m.get("_id")
+            room_id    = m.get("rid")
             if message_id:
-                # Save the mapping from message id to student session.
                 ta_msg_to_student_session[message_id] = session_id
                 print(f"DEBUG: Mapped message id {message_id} to session {session_id}")
+            if room_id:
+                ta_msg_to_student_session[room_id] = session_id
+                print(f"DEBUG: Mapped room id {room_id} to session {session_id}")
         # print("DEBUG: Direct message sent:", response.json())
     except Exception as e:
         print("DEBUG: Error sending direct message to TA:", e)
@@ -477,34 +481,26 @@ def query():
         print("DEBUG: ===== RESPOND BUTTON CLICKED =====")
         print("DEBUG: full payload:", data)
 
-        # 1) pull Rocket.Chat’s message_id
-        msg_id = data.get("message_id")
-        print(f"DEBUG: extracted message_id -> {msg_id!r}")
-        if not msg_id:
-            print("DEBUG: no 'message_id' in payload → ignoring")
-            return jsonify({"status": "ignored"})
+        # first try to look up by button’s message_id
+        lookup_key = data.get("message_id")
 
-        # 2) look up which student that maps to
-        print("DEBUG: current ta_msg_to_student_session map:", ta_msg_to_student_session)
-        student_username = ta_msg_to_student_session.get(msg_id)
-        print(f"DEBUG: ta_msg_to_student_session[{msg_id!r}] -> {student_username!r}")
+        # if that fails, fall back to the channel (room) id
+        if lookup_key not in ta_msg_to_student_session:
+            lookup_key = data.get("channel_id")
+
+        student_username = ta_msg_to_student_session.get(lookup_key)
         if not student_username:
-            print(f"DEBUG: no mapping for message_id {msg_id!r} → ignoring")
+            print(f"DEBUG: no mapping for message_id/channel_id '{lookup_key}' → ignoring")
             return jsonify({"status": "ignored"})
 
-        # 3) build the student’s session and ensure we have a bucket for them
         student_session_id = f"session_{student_username}_twips_research"
-        print(f"DEBUG: derived student_session_id = {student_session_id}")
         conversation_history.setdefault(student_session_id, {
             "messages": [], "question_flow": None, "awaiting_ta_response": False
         })
 
-        # 4) set the “awaiting TA response” flag on *that* student’s session
         conversation_history[student_session_id]["awaiting_ta_response"] = True
-        print(f"DEBUG: set conversation_history[{student_session_id}]['awaiting_ta_response'] = True")
+        print(f"DEBUG: set awaiting_ta_response for {student_session_id}")
 
-        # 5) prompt *this* TA (your session_id) to type their answer
-        print("DEBUG: prompting TA to type their response to the student")
         return jsonify({
             "text": "Please type your response to the student.",
             "session_id": session_id
