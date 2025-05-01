@@ -897,8 +897,8 @@ def query():
                     "", 
                     f"The user is asking a general question to learn more about the paper. "
                     "Give a short teaser (1 sentence) hinting at the answer **only if** it's clearly stated in the paper. "
-                    "Then, point the user to the **specific section title** that contains the answer, and bold it using Markdown (**like this**). "
-                    "If you're unsure which section is best, suggest the most relevant one based on the topic of the question. Do not default to **User Study Overview** unless it's truly relevant.",
+                    "Then, point the user to the **specific section title** that most specifically contains the answer, and bold it using Markdown (**like this**). ",
+                    # "If you're unsure which section is best, suggest the most relevant one based on the topic of the question. Do not default to **User Study Overview** unless it's truly relevant.",
                     session_id
                 )
                 
