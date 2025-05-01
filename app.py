@@ -67,11 +67,19 @@ def generate_response(system, prompt, session_id):
         system = ("You are a TA chatbot for CS-150. Answer only based on the uploaded paper. "
                   "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
     response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
+                        lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
+
+    if isinstance(response, dict):
+        return response.get("response", "").strip()
+    return response.strip()
+
+def generate_paper_response(system, prompt, session_id):
+    if not system:
+        system = ("You are a TA chatbot for CS-150. Answer only based on the uploaded paper. "
+                  "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
+    response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
                         lastk=5, rag_usage=True, rag_threshold=0.01, rag_k=10)
-                        #  lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
-
-    # print("DEBUG: Retrieved Chunks:", response["sources"])
-
+                        lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
 
     if isinstance(response, dict):
         return response.get("response", "").strip()
@@ -893,7 +901,7 @@ def query():
 
             if specificity == "asking_for_details":
                 print("DEBUG: Generating Elusive response about Paper...")
-                answer = generate_response(
+                answer = generate_paper_response(
                     "", 
                     f"The user is asking a general question to learn more about the paper. "
                     "Give a short teaser (1 sentence) hinting at the answer **only if** it's clearly stated in the paper. "
@@ -905,10 +913,10 @@ def query():
             else:
                 if difficulty == "factual":
                     print("DEBUG: Generating Factual response about Paper...")
-                    answer = generate_response("", f"Answer factually: {message}", session_id)
+                    answer = generate_paper_response("", f"Answer factually: {message}", session_id)
                 else:
                     print("DEBUG: Generating Detailed response about Paper...")
-                    answer = generate_response(
+                    answer = generate_paper_response(
                         "", 
                         f"Confirm if their understanding is correct. "
                         "Then, respond with the correct answer of this conceptual question in 2-3 sentences based on the paper. "
