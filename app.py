@@ -49,6 +49,7 @@ def upload_pdf_if_needed(pdf_path, session_id):
         return False
 
 def wait_for_pdf_ready(session_id, max_attempts=15, delay=2):
+    print(f"DEBUG: Waiting for PDF\n")
     if pdf_ready.get(session_id):
         return True
     for _ in range(max_attempts):
@@ -60,6 +61,7 @@ def wait_for_pdf_ready(session_id, max_attempts=15, delay=2):
     return False
 
 def ensure_pdf_processed(session_id):
+    print(f"DEBUG: PDF processed\n")
     return upload_pdf_if_needed(PDF_PATH, session_id) and wait_for_pdf_ready(session_id)
 
 def generate_response(system, prompt, session_id):
@@ -67,10 +69,45 @@ def generate_response(system, prompt, session_id):
         system = ("You are a TA chatbot for CS-150. Answer only based on the uploaded paper. "
                   "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
     response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
-                         lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
+                        lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
+
     if isinstance(response, dict):
         return response.get("response", "").strip()
     return response.strip()
+
+def generate_paper_response(system, prompt, session_id):
+    if not system:
+        system = ("You are a TA chatbot for CS-150. Answer only based on the uploaded paper. "
+                  "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
+    response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
+                        lastk=5, rag_usage=True, rag_threshold=0.01, rag_k=10)
+
+    if isinstance(response, dict):
+        return response.get("response", "").strip()
+    return response.strip()
+
+# def classify_message(message, session_id):
+#     prompt = (
+#         f"Given this message: \"{message}\", classify it in 3 ways:\n\n"
+#         f"1. Topic: One of ['greeting', 'content_about_paper', 'class_logistics', 'off_topic']\n"
+#         f"2. Difficulty: 'factual' or 'conceptual'\n"
+#         f"3. Specificity: 'asking_for_details' or 'confirming_understanding'\n\n"
+#         f"Respond in JSON:\n"
+#         f"{{\"topic\": ..., \"difficulty\": ..., \"specificity\": ...}}"
+#     )
+#     try:
+#         response = generate_response("", prompt, session_id)
+#         import json
+#         return json.loads(response)
+#     except Exception as e:
+#         print("DEBUG: Error in classify_message:", e)
+#         # Fallback to default
+#         return {
+#             "topic": "content_about_paper",
+#             "difficulty": "conceptual",
+#             "specificity": "asking_for_details"
+#         }
+
 
 def classify_query(message, session_id):
     prompt = (f"Classify the following user question into exactly one of:\n\n"
@@ -82,6 +119,7 @@ def classify_query(message, session_id):
               f"User Message: \"{message}\"")
     
     classification = generate_response("", prompt, session_id).lower().strip()
+    print(f"DEBUG: Classification: ", classification)
     
     if "greeting" in classification:
         return "greeting"
@@ -100,6 +138,24 @@ def classify_difficulty(question, session_id):
     difficulty = generate_response("", prompt, session_id).lower()
     return "factual" if "factual" in difficulty else "conceptual"
 
+def classify_specificity(question: str, session_id: str) -> str:
+    """
+    Use the LLM to classify a question as 'general' or 'specific'.
+    """
+    prompt = (
+        "Classify the following question based on its intent:\n\n"
+        "- 'asking_for_details' → if the user is trying to understand a topic, section, or process in the paper that they likely don't know yet. "
+        "These questions are broad, open-ended, or exploratory.\n"
+        "- 'confirming_understanding' → if the user is checking whether something they believe or suspect is correct based on the paper. "
+        "These questions are often yes/no, comparative, or reflect partial understanding.\n\n"
+        f"Question: \"{question}\"\n\n"
+        "Respond with only one word: 'asking_for_details' or 'confirming_understanding'."
+    )
+    response = generate_response("", prompt, session_id)
+    print(f"DEBUG: Specificity classifed as: ", response)
+    return response.strip().lower()
+
+
 def generate_followup(session_id, override_last_bot=None):
     if override_last_bot:
         last_bot_message = override_last_bot
@@ -112,8 +168,9 @@ def generate_followup(session_id, override_last_bot=None):
     # graceful fallback
     if not last_bot_message:
         return ("I need a little context first — ask me something about "
-                "the paper, then press **Generate Follow-up**! 😊")
+                "the paper, then press **Get a Follow-up Question**! 😊")
 
+    print(f"DEBUG: creating followup question \n")
     prompt = (
         f"You are acting as a TA chatbot helping a student think critically about a research paper.\n\n"
         f"Based on the last response you gave:\n\n"
@@ -149,8 +206,8 @@ def show_buttons(text, session_id, summary_button=False, followup_button=False):
         attachments.append({
             "actions": [{
                 "type": "button",
-                "text": "🎲 Generate Follow-up",
-                "msg": f"__FOLLOWUP__|{encoded}",
+                "text": "🎲 Get a Follow-up Question",
+                "msg": f"__FOLLOWUP__ | {encoded}",
                 "msg_in_chat_window": True,
                 "msg_processing_type": "sendMessage"
             }]
@@ -380,6 +437,7 @@ def generate_suggested_question(session_id, student_question, feedback=None):
          result = response.get('response', '').strip()
     else:
          result = response.strip()
+         
     # Optionally extract a quoted sentence if present
     match = re.search(r'"(.*?)"', result)
     suggested_question_clean = match.group(1) if match else result
@@ -726,10 +784,10 @@ def query():
     # ----------------------------
     # Follow-up Question Workflow
     # ----------------------------
-    if message.startswith("__FOLLOWUP__|") or message.lower() == "generate_followup":
+    if message.startswith("__FOLLOWUP__ | ") or message.lower() == "generate_followup":
         # decode last-bot override if present
         override = None
-        if message.startswith("__FOLLOWUP__|"):
+        if message.startswith("__FOLLOWUP__ | "):
             _, raw = message.split("|", 1)
             override = raw.replace("\\n", "\n").replace('\\"', '"')
 
@@ -797,6 +855,11 @@ def query():
     # Process normal message
     conversation_history[session_id]["messages"].append(("user", message))
     classification = classify_query(message, session_id)
+    # classification_data = classify_message(message, session_id)
+    # classification = classification_data["topic"]
+    # difficulty = classification_data["difficulty"]
+    # specificity = classification_data["specificity"]
+
     print(f"DEBUG: Classified as {classification}")
 
     if classification == "greeting":
@@ -809,7 +872,7 @@ def query():
             "I'll guide you to the key sections and ask thought-provoking questions—but I won't just hand you the answers. 🤫\n\n"
             f"**{intro}**\n\n"
             "If there's a question I can't fully answer, I'll prompt you to forward it to your TA. "
-            "Please ask a question about the paper now or click one of the buttons below!"
+            "Please ask a question about the paper now or click one of the buttons below! "
             "You have two buttons to choose from:\n"
             "- 📄 **Quick Summary** - Get a concise 3-4 sentence overview of the paper's main objectives and findings.\n"
             "- 🧑‍🏫 **Ask TA** - Send your question to a human TA if you'd like extra help.\n\n"
@@ -819,7 +882,6 @@ def query():
         return jsonify(show_buttons(greeting_msg, session_id, summary_button=True))
 
     if classification == "content_about_paper":
-        difficulty = classify_difficulty(message, session_id)
         ensure_pdf_processed(session_id)
 
         # Use LLM to detect metadata questions (authors, title, publication, etc.)
@@ -856,15 +918,33 @@ def query():
             )
             answer = answer["response"].strip() if isinstance(answer, dict) else answer.strip()
         else:
-            # Normal factual vs conceptual answering
-            if difficulty == "factual":
-                answer = generate_response("", f"Answer factually: {message}", session_id)
-            else:
-                answer = generate_response(
+            specificity = classify_specificity(message, session_id)
+            
+            if specificity == "asking_for_details":
+                print("DEBUG: Generating Elusive response about Paper...")
+                answer = generate_paper_response(
                     "", 
-                    f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}", 
+                    f"The user is asking a general question to learn more about the paper. "
+                    "Give a short teaser (1 sentence) hinting at the answer **only if** it's clearly stated in the paper. "
+                    "Then, point the user to the **specific section title** that most specifically contains the answer (ie. 4.1 Participant Recruiting), and bold it using Markdown (**like this**). ",
                     session_id
                 )
+                
+            else:
+                difficulty = classify_difficulty(message, session_id)
+                if difficulty == "factual":
+                    print("DEBUG: Generating Factual response about Paper...")
+                    answer = generate_paper_response("", f"Answer factually: {message}", session_id)
+                else:
+                    print("DEBUG: Generating Detailed response about Paper...")
+                    answer = generate_paper_response(
+                        "", 
+                        f"Confirm if their understanding is correct. "
+                        "Then, respond with the correct answer of this conceptual question in 2-3 sentences based on the paper. "
+                        "Only include information you are confident is accurate.", 
+                        session_id
+                    )
+
 
         conversation_history[session_id]["messages"].append(("bot", answer))
         return jsonify(show_buttons(answer, session_id, followup_button=True))
