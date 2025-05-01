@@ -851,8 +851,6 @@ def query():
         return jsonify(show_buttons(greeting_msg, session_id, summary_button=True))
 
     if classification == "content_about_paper":
-        specificity = classify_specificity(message, session_id)
-        difficulty = classify_difficulty(message, session_id)
         ensure_pdf_processed(session_id)
 
         # Use LLM to detect metadata questions (authors, title, publication, etc.)
@@ -889,16 +887,8 @@ def query():
             )
             answer = answer["response"].strip() if isinstance(answer, dict) else answer.strip()
         else:
-            # Normal factual vs conceptual answering
-            # if difficulty == "factual":
-            #     answer = generate_response("", f"Answer factually: {message}", session_id)
-            # else:
-            #     answer = generate_response(
-            #         "", 
-            #         f"Answer conceptually in 1-2 sentences, then suggest where to look in the paper for details: {message}", 
-            #         session_id
-            #     )
-
+            specificity = classify_specificity(message, session_id)
+            
             if specificity == "asking_for_details":
                 print("DEBUG: Generating Elusive response about Paper...")
                 answer = generate_paper_response(
@@ -906,11 +896,11 @@ def query():
                     f"The user is asking a general question to learn more about the paper. "
                     "Give a short teaser (1 sentence) hinting at the answer **only if** it's clearly stated in the paper. "
                     "Then, point the user to the **specific section title** that most specifically contains the answer (ie. 4.1 Participant Recruiting), and bold it using Markdown (**like this**). ",
-                    # "If you're unsure which section is best, suggest the most relevant one based on the topic of the question. Do not default to **User Study Overview** unless it's truly relevant.",
                     session_id
                 )
                 
             else:
+                difficulty = classify_difficulty(message, session_id)
                 if difficulty == "factual":
                     print("DEBUG: Generating Factual response about Paper...")
                     answer = generate_paper_response("", f"Answer factually: {message}", session_id)
