@@ -496,20 +496,33 @@ def query():
         return jsonify({"status": "ignored"})
 
     # ────────────────────────────────
-    # Human‐TA “Respond” button
+    # TA “Respond” button clicked
     # ────────────────────────────────
     if message.lower() == "respond":
         print("DEBUG: Respond button clicked")
-        msg_id       = data.get("message", {}).get("_id")
+        # the button payload carries the original TA-DM message id
+        msg_id = data.get("message", {}).get("_id")
         student_sess = ta_msg_to_student_session.get(msg_id)
         if student_sess:
-            print(f"DEBUG: Responding to student session {student_sess}")
-            conversation_history.setdefault(student_sess, {"messages":[]})
-            conversation_history[student_sess]["awaiting_ta_response"] = True
+            # mark that *this* TA session is now awaiting a free-text reply
+            conversation_history[session_id]["awaiting_ta_response"] = student_sess
+            print(f"DEBUG: Session {session_id} will forward next message to {student_sess}")
             return jsonify({
                 "text": "Please type your response to the student.",
-                "session_id": student_sess
+                "session_id": session_id
             })
+        
+    # ───────────────────────────────────────
+    # TA’s free-text reply → forward to student
+    # ───────────────────────────────────────
+    target = conversation_history[session_id].pop("awaiting_ta_response", None)
+    if target:
+        print(f"DEBUG: Forwarding TA reply from {session_id} to student {target}: {message}")
+        forward_message_to_student(message, session_id, target)
+        return jsonify({
+            "text": "✅ Your response has been forwarded to the student.",
+            "session_id": session_id
+        })
 
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
@@ -869,10 +882,6 @@ def query():
     # Process normal message
     conversation_history[session_id]["messages"].append(("user", message))
     classification = classify_query(message, session_id)
-    # classification_data = classify_message(message, session_id)
-    # classification = classification_data["topic"]
-    # difficulty = classification_data["difficulty"]
-    # specificity = classification_data["specificity"]
 
     print(f"DEBUG: Classified as {classification}")
 
