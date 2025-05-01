@@ -86,74 +86,74 @@ def generate_paper_response(system, prompt, session_id):
         return response.get("response", "").strip()
     return response.strip()
 
-def classify_message(message, session_id):
-    prompt = (
-        f"Given this message: \"{message}\", classify it in 3 ways:\n\n"
-        f"1. Topic: One of ['greeting', 'content_about_paper', 'class_logistics', 'off_topic']\n"
-        f"2. Difficulty: 'factual' or 'conceptual'\n"
-        f"3. Specificity: 'asking_for_details' or 'confirming_understanding'\n\n"
-        f"Respond in JSON:\n"
-        f"{{\"topic\": ..., \"difficulty\": ..., \"specificity\": ...}}"
-    )
-    try:
-        response = generate_response("", prompt, session_id)
-        import json
-        return json.loads(response)
-    except Exception as e:
-        print("DEBUG: Error in classify_message:", e)
-        # Fallback to default
-        return {
-            "topic": "content_about_paper",
-            "difficulty": "conceptual",
-            "specificity": "asking_for_details"
-        }
-
-
-# def classify_query(message, session_id):
-#     prompt = (f"Classify the following user question into exactly one of:\n\n"
-#               "- 'greeting' (if it's just hello/hi/hey)\n"
-#               "- 'content_about_paper' (if it asks anything about the uploaded research paper, e.g., methods, results, ideas, implications)\n"
-#               "- 'class_logistics' (if it asks about class logistics: deadlines, project presentations, grading, TA office hours, etc.)\n"
-#               "- 'off_topic' (if it talks about unrelated things like food, movies, hobbies, etc.)\n\n"
-#               "Return only the label itself.\n\n"
-#               f"User Message: \"{message}\"")
-    
-#     classification = generate_response("", prompt, session_id).lower().strip()
-#     print(f"DEBUG: Classification: ", classification)
-    
-#     if "greeting" in classification:
-#         return "greeting"
-#     if "content_about_paper" in classification:
-#         return "content_about_paper"
-#     if "class_logistics" in classification:
-#         return "class_logistics"
-#     if "off_topic" in classification:
-#         return "off_topic"
-#     return "content_about_paper"  # safe fallback
-
-
-# def classify_difficulty(question, session_id):
-#     prompt = (f"Classify the following question as 'factual' or 'conceptual'. "
-#               f"Factual = lookup info; Conceptual = requires explanation.\n\nQuestion: \"{question}\"")
-#     difficulty = generate_response("", prompt, session_id).lower()
-#     return "factual" if "factual" in difficulty else "conceptual"
-
-# def classify_specificity(question: str, session_id: str) -> str:
-#     """
-#     Use the LLM to classify a question as 'general' or 'specific'.
-#     """
+# def classify_message(message, session_id):
 #     prompt = (
-#         "Classify the following question based on its intent:\n\n"
-#         "- 'asking_for_details' → if the user is trying to understand a topic, section, or process in the paper that they likely don't know yet. "
-#         "These questions are broad, open-ended, or exploratory.\n"
-#         "- 'confirming_understanding' → if the user is checking whether something they believe or suspect is correct based on the paper. "
-#         "These questions are often yes/no, comparative, or reflect partial understanding.\n\n"
-#         f"Question: \"{question}\"\n\n"
-#         "Respond with only one word: 'asking_for_details' or 'confirming_understanding'."
+#         f"Given this message: \"{message}\", classify it in 3 ways:\n\n"
+#         f"1. Topic: One of ['greeting', 'content_about_paper', 'class_logistics', 'off_topic']\n"
+#         f"2. Difficulty: 'factual' or 'conceptual'\n"
+#         f"3. Specificity: 'asking_for_details' or 'confirming_understanding'\n\n"
+#         f"Respond in JSON:\n"
+#         f"{{\"topic\": ..., \"difficulty\": ..., \"specificity\": ...}}"
 #     )
-#     response = generate_response("", prompt, session_id)
-#     print(f"DEBUG: Specificity classifed as: ", response)
-#     return response.strip().lower()
+#     try:
+#         response = generate_response("", prompt, session_id)
+#         import json
+#         return json.loads(response)
+#     except Exception as e:
+#         print("DEBUG: Error in classify_message:", e)
+#         # Fallback to default
+#         return {
+#             "topic": "content_about_paper",
+#             "difficulty": "conceptual",
+#             "specificity": "asking_for_details"
+#         }
+
+
+def classify_query(message, session_id):
+    prompt = (f"Classify the following user question into exactly one of:\n\n"
+              "- 'greeting' (if it's just hello/hi/hey)\n"
+              "- 'content_about_paper' (if it asks anything about the uploaded research paper, e.g., methods, results, ideas, implications)\n"
+              "- 'class_logistics' (if it asks about class logistics: deadlines, project presentations, grading, TA office hours, etc.)\n"
+              "- 'off_topic' (if it talks about unrelated things like food, movies, hobbies, etc.)\n\n"
+              "Return only the label itself.\n\n"
+              f"User Message: \"{message}\"")
+    
+    classification = generate_response("", prompt, session_id).lower().strip()
+    print(f"DEBUG: Classification: ", classification)
+    
+    if "greeting" in classification:
+        return "greeting"
+    if "content_about_paper" in classification:
+        return "content_about_paper"
+    if "class_logistics" in classification:
+        return "class_logistics"
+    if "off_topic" in classification:
+        return "off_topic"
+    return "content_about_paper"  # safe fallback
+
+
+def classify_difficulty(question, session_id):
+    prompt = (f"Classify the following question as 'factual' or 'conceptual'. "
+              f"Factual = lookup info; Conceptual = requires explanation.\n\nQuestion: \"{question}\"")
+    difficulty = generate_response("", prompt, session_id).lower()
+    return "factual" if "factual" in difficulty else "conceptual"
+
+def classify_specificity(question: str, session_id: str) -> str:
+    """
+    Use the LLM to classify a question as 'general' or 'specific'.
+    """
+    prompt = (
+        "Classify the following question based on its intent:\n\n"
+        "- 'asking_for_details' → if the user is trying to understand a topic, section, or process in the paper that they likely don't know yet. "
+        "These questions are broad, open-ended, or exploratory.\n"
+        "- 'confirming_understanding' → if the user is checking whether something they believe or suspect is correct based on the paper. "
+        "These questions are often yes/no, comparative, or reflect partial understanding.\n\n"
+        f"Question: \"{question}\"\n\n"
+        "Respond with only one word: 'asking_for_details' or 'confirming_understanding'."
+    )
+    response = generate_response("", prompt, session_id)
+    print(f"DEBUG: Specificity classifed as: ", response)
+    return response.strip().lower()
 
 
 def generate_followup(session_id, override_last_bot=None):
@@ -751,7 +751,7 @@ def query():
             return jsonify(resp)
         # “No” → fallback to a paper‐based answer
         ensure_pdf_processed(session_id)
-        # difficulty = classify_difficulty(message, session_id)
+        difficulty = classify_difficulty(message, session_id)
         if difficulty == "factual":
             answer = generate_response(
                 "", f"Answer factually: {message}", session_id
@@ -854,11 +854,11 @@ def query():
             
     # Process normal message
     conversation_history[session_id]["messages"].append(("user", message))
-    # classification = classify_query(message, session_id)
-    classification_data = classify_message(message, session_id)
-    classification = classification_data["topic"]
-    difficulty = classification_data["difficulty"]
-    specificity = classification_data["specificity"]
+    classification = classify_query(message, session_id)
+    # classification_data = classify_message(message, session_id)
+    # classification = classification_data["topic"]
+    # difficulty = classification_data["difficulty"]
+    # specificity = classification_data["specificity"]
 
     print(f"DEBUG: Classified as {classification}")
 
@@ -918,7 +918,7 @@ def query():
             )
             answer = answer["response"].strip() if isinstance(answer, dict) else answer.strip()
         else:
-            # specificity = classify_specificity(message, session_id)
+            specificity = classify_specificity(message, session_id)
             
             if specificity == "asking_for_details":
                 print("DEBUG: Generating Elusive response about Paper...")
@@ -931,7 +931,7 @@ def query():
                 )
                 
             else:
-                # difficulty = classify_difficulty(message, session_id)
+                difficulty = classify_difficulty(message, session_id)
                 if difficulty == "factual":
                     print("DEBUG: Generating Factual response about Paper...")
                     answer = generate_paper_response("", f"Answer factually: {message}", session_id)
