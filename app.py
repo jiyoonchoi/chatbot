@@ -892,7 +892,8 @@ def query():
                     "", 
                     f"Give a one sentence teaser or hint of the answer to the question, but avoid giving a detailed explanation. "
                     "Then, encourage the user to explore the section of the paper that directly discusses the answer to their question and "
-                    "please bold the section of the paper to refer to using Markdown (**like this**).", 
+                    "please bold the section of the paper to refer to using Markdown (**like this**)."
+                    "For example, if the user asks about what the findings of the paper are, direct them to the 'Findings' section", 
                     session_id
                 )
             else:
