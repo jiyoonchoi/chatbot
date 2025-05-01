@@ -508,15 +508,34 @@ def query():
         pdf_ready.pop(session_id, None)
 
     # TA “Respond to Student” button clicked
-    if message == "respond":
-        # Process TA response prompt. For example, set flag and prompt for typed response.
-        msg_id = next(reversed(ta_msg_to_student_session))
-        student_username = ta_msg_to_student_session[msg_id]
-        student_session_id = f"session_{student_username}_twips_research"
-        conversation_history[student_session_id]["awaiting_ta_response"] = True
-        print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
+    if message.lower() == "respond":
+        # 1) grab the original DM’s message id from the button payload
+        msg = data.get("message", {})
+        msg_id = msg.get("_id")
+        if not msg_id:
+            # we didn’t get a message id, so nothing to do
+            return jsonify({"status": "ignored"})
 
-        return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
+        # 2) look up which student that maps to
+        student_username = ta_msg_to_student_session.get(msg_id)
+        if not student_username:
+            # unknown mapping, ignore
+            return jsonify({"status": "ignored"})
+
+        # 3) build their session_id and ensure it exists
+        student_session_id = f"session_{student_username}_twips_research"
+        conversation_history.setdefault(student_session_id, {
+            "messages": [], "question_flow": None, "awaiting_ta_response": False
+        })
+
+        # 4) set the flag on the *student* session so that the next message goes to them
+        conversation_history[student_session_id]["awaiting_ta_response"] = True
+
+        # 5) prompt the TA (we remain in the TA’s own session)
+        return jsonify({
+            "text": "Please type your response to the student.",
+            "session_id": session_id
+        })
 
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
