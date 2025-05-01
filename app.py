@@ -703,20 +703,6 @@ def query():
     else:
         msg_id = None
    
-    if message.lower() == "respond" and ta_msg_to_student_session:
-        # grab the latest TA→student mapping
-        msg_id = next(reversed(ta_msg_to_student_session))
-        student_username = ta_msg_to_student_session[msg_id]
-        student_session_id = f"session_{student_username}_twips_research"
-
-        conversation_history.setdefault(student_session_id, {"messages":[]})
-        conversation_history[student_session_id]["awaiting_ta_response"] = True
-        print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
-        return jsonify({
-            "text": "Please type your response to the student.",
-            "session_id": student_session_id
-        })
-    
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
