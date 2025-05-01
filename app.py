@@ -290,19 +290,17 @@ def send_direct_message_to_TA(question, session_id, ta_username):
         response = requests.post(msg_url, json=payload, headers=headers)
         resp_data = response.json()
         print("DEBUG: Direct message sent:", resp_data)
-
+        # Extract the unique message _id returned from Rocket.Chat:
         if resp_data.get("success") and "message" in resp_data:
-            msg = resp_data["message"]
-            message_id = msg.get("_id")
-            room_id    = msg.get("rid")
+            message_id = resp_data["message"].get("_id")
             if message_id:
+                # Save the mapping from message id to student session.
                 ta_msg_to_student_session[message_id] = session_id
                 print(f"DEBUG: Mapped message id {message_id} to session {session_id}")
-            if room_id:
-                ta_msg_to_student_session[room_id] = session_id
-                print(f"DEBUG: Mapped room   id {room_id}    to session {session_id}")
+        # print("DEBUG: Direct message sent:", response.json())
     except Exception as e:
         print("DEBUG: Error sending direct message to TA:", e)
+
 # -----------------------------------------------------------------------------
 # TA-student Messaging Function (forward question to student)
 # -----------------------------------------------------------------------------
@@ -467,32 +465,17 @@ def query():
     # ────────────────────────────────
     if message.lower() == "respond":
         print("DEBUG: Respond button clicked")
-        print("DEBUG: full payload:", data)
-
-        # 1) try the direct message ID
-        msg_id = data.get("message_id") or data.get("message", {}).get("_id")
+        msg_id       = data.get("message", {}).get("_id")
         student_sess = ta_msg_to_student_session.get(msg_id)
-        print(f"DEBUG: lookup by msg_id[{msg_id!r}] -> {student_sess!r}")
-
-        # 2) fallback to the room/channel
-        if not student_sess:
-            room_id = data.get("channel_id")
-            student_sess = ta_msg_to_student_session.get(room_id)
-            print(f"DEBUG: lookup by channel_id[{room_id!r}] -> {student_sess!r}")
-
-        if not student_sess:
-            print("DEBUG: no mapping found → ignoring button")
-            return jsonify({"status": "ignored"})
-
-        # 3) flag that student session and prompt the TA
-        print(f"DEBUG: Responding to student session {student_sess}")
-        conversation_history.setdefault(student_sess, {"messages": [], "awaiting_ta_response": False})
-        conversation_history[student_sess]["awaiting_ta_response"] = True
-
-        return jsonify({
-            "text": "Please type your response to the student.",
-            "session_id": student_sess
-        })
+        print("student_sess: ", student_sess)
+        if student_sess:
+            print(f"DEBUG: Responding to student session {student_sess}")
+            conversation_history.setdefault(student_sess, {"messages":[]})
+            conversation_history[student_sess]["awaiting_ta_response"] = True
+            return jsonify({
+                "text": "Please type your response to the student.",
+                "session_id": student_sess
+            })
 
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
