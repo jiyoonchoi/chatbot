@@ -728,14 +728,21 @@ def query():
     else:
         msg_id = None
 
-    if message == "respond":
+    if message.lower() == "respond":
+        # the button payload carries the original TA-DM message id
+        msg_id = data.get("message", {}).get("_id")
+        student_username = ta_msg_to_student_session.get(msg_id)
+        if student_username:
             student_session_id = f"session_{student_username}_twips_research"
-            # Process TA response prompt. For example, set flag and prompt for typed response.
-            print(data.get("text"))
-            conversation_history[student_session_id]["awaiting_ta_response"] = True
-            print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
-
-            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
+            # ensure we have a conversation bucket for them
+            conversation_history.setdefault(student_session_id, {"messages": []})
+            # now we’re waiting for the TA’s free-text reply
+            conversation_history[session_id]["awaiting_ta_response"] = student_session_id
+            print(f"DEBUG: Session {session_id} will forward next message to {student_session_id}")
+            return jsonify({
+                "text": "Please type your response to the student.",
+                "session_id": session_id
+            })
    
     # ----------------------------
     # End of TA Question Workflow
