@@ -761,7 +761,7 @@ def query():
     if message.startswith("__FOLLOWUP__ | ") or message.lower() == "generate_followup":
         # decode last-bot override if present
         override = None
-        if message.startswith("__FOLLOWUP__|"):
+        if message.startswith("__FOLLOWUP__ | "):
             _, raw = message.split("|", 1)
             override = raw.replace("\\n", "\n").replace('\\"', '"')
 
