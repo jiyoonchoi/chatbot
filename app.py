@@ -68,7 +68,7 @@ def generate_response(system, prompt, session_id):
                   "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
     response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
                         #  lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
-                        lastk=5, rag_usage=True, rag_threshold=0.2, rag_k=8
+                        lastk=5, rag_usage=True, rag_threshold=0.2, rag_k=8)
 
     if isinstance(response, dict):
         return response.get("response", "").strip()
