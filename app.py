@@ -467,6 +467,7 @@ def query():
         print("DEBUG: Respond button clicked")
         msg_id       = data.get("message", {}).get("_id")
         student_sess = ta_msg_to_student_session.get(msg_id)
+        print("student_sess: ", student_sess)
         if student_sess:
             print(f"DEBUG: Responding to student session {student_sess}")
             conversation_history.setdefault(student_sess, {"messages":[]})
