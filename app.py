@@ -67,8 +67,8 @@ def generate_response(system, prompt, session_id):
         system = ("You are a TA chatbot for CS-150. Answer only based on the uploaded paper. "
                   "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
     response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
-                        #  lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
                         lastk=5, rag_usage=True, rag_threshold=0.2, rag_k=8)
+                        #  lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
 
     if isinstance(response, dict):
         return response.get("response", "").strip()
@@ -892,13 +892,9 @@ def query():
                 print("DEBUG: Generating Elusive response about Paper...")
                 answer = generate_response(
                     "", 
-                #     f"Give a one sentence teaser or hint of the answer to the question, but avoid giving a detailed explanation. "
-                #     "Then, encourage the user to explore the section of the paper that directly discusses the answer to their question and "
-                #     "please bold the section of the paper to refer to using Markdown (**like this**)."
-                #     "For example, if the user asks about what the findings of the paper are, direct them to the 'Findings' section", 
                     f"The user is asking a general question to learn more about the paper. "
                     "Give a short teaser (1 sentence) hinting at the answer **only if** it's clearly stated in the paper. "
-                    "Then, point the user to the **specific section title** that contains the answer, and bold it using Markdown like this: **Findings**. "
+                    "Then, point the user to the **specific section title** that contains the answer, and bold it using Markdown (**like this**). "
                     "If you're unsure which section is best, suggest the most relevant one based on the topic of the question. Do not default to **User Study Overview** unless it's truly relevant.",
                     session_id
                 )
