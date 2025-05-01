@@ -49,6 +49,7 @@ def upload_pdf_if_needed(pdf_path, session_id):
         return False
 
 def wait_for_pdf_ready(session_id, max_attempts=15, delay=2):
+    print(f"DEBUG: Waiting for PDF\n")
     if pdf_ready.get(session_id):
         return True
     for _ in range(max_attempts):
@@ -60,6 +61,7 @@ def wait_for_pdf_ready(session_id, max_attempts=15, delay=2):
     return False
 
 def ensure_pdf_processed(session_id):
+    print(f"DEBUG: PDF processed\n")
     return upload_pdf_if_needed(PDF_PATH, session_id) and wait_for_pdf_ready(session_id)
 
 def generate_response(system, prompt, session_id):
