@@ -509,16 +509,24 @@ def query():
 
     # TA “Respond to Student” button clicked
     if message.lower() == "respond":
-        print("respond button clicked")
-        msg_id = data.get("message", {}).get("_id")
-        student = ta_msg_to_student_session.get(msg_id)
-        student_session_id = f"session_{student}_twips_research" if student else None
+        msg_id = data["message"]["_id"]
+        student_username = ta_msg_to_student_session[msg_id]
+        student_session_id = f"session_{student_username}_twips_research"
 
-        if student:
-            print(f"DEBUG: Responding to student {student} in session {student_session_id}")
-            # remember that *this* TA session is now waiting for free-text
-            conversation_history[student_session_id]["awaiting_ta_response"] = True
-            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
+        # make sure we have a conversation record for them
+        conversation_history.setdefault(student_session_id, {
+        "messages": [], "question_flow": None, "awaiting_ta_response": False
+        })
+
+        # set the flag _on_ the student’s bucket
+        conversation_history[student_session_id]["awaiting_ta_response"] = True
+
+        return jsonify({
+        "text": "Please type your response to the student.",
+        # keep the TA in their own session so the next POST still has session_id=TA’s
+        "session_id": session_id
+        })
+
 
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
