@@ -503,6 +503,14 @@ def query():
         summary_cache.pop(session_id, None)
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
+    
+    target = conversation_history[session_id].pop("awaiting_ta_response", None)
+    if target:
+        forward_message_to_student(message, session_id, target)
+        return jsonify({
+        "text": "✅ Your response has been forwarded to the student.",
+        "session_id": session_id
+        })
 
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
@@ -517,6 +525,21 @@ def query():
     # ----------------------------
     # TA Question Workflow
     # ----------------------------
+
+    # TA “Respond to Student” button clicked
+    if message.lower() == "respond":
+        msg_id = data.get("message", {}).get("_id")
+        student_username = ta_msg_to_student_session.get(msg_id)
+        if student_username:
+            student_session_id = f"session_{student_username}_twips_research"
+
+            # mark that *this* TA session is now expecting a free-text reply
+            conversation_history[session_id]["awaiting_ta_response"] = student_session_id
+
+            return jsonify({
+                "text": "Please type your response to the student.",
+                "session_id": session_id
+            })
 
     if message == "ask_TA": 
         conversation_history[session_id]["awaiting_ta_question"] = False
@@ -728,22 +751,6 @@ def query():
     else:
         msg_id = None
 
-    if message.lower() == "respond":
-        # the button payload carries the original TA-DM message id
-        msg_id = data.get("message", {}).get("_id")
-        student_username = ta_msg_to_student_session.get(msg_id)
-        if student_username:
-            student_session_id = f"session_{student_username}_twips_research"
-            # ensure we have a conversation bucket for them
-            conversation_history.setdefault(student_session_id, {"messages": []})
-            # now we’re waiting for the TA’s free-text reply
-            conversation_history[session_id]["awaiting_ta_response"] = student_session_id
-            print(f"DEBUG: Session {session_id} will forward next message to {student_session_id}")
-            return jsonify({
-                "text": "Please type your response to the student.",
-                "session_id": session_id
-            })
-   
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
