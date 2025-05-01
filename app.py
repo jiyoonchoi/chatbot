@@ -79,7 +79,6 @@ def generate_paper_response(system, prompt, session_id):
                   "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
     response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
                         lastk=5, rag_usage=True, rag_threshold=0.01, rag_k=10)
-                        lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
 
     if isinstance(response, dict):
         return response.get("response", "").strip()
