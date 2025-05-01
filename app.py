@@ -507,26 +507,6 @@ def query():
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
 
-    # TA “Respond to Student” button clicked
-    if message.lower() == "respond":
-        msg_id = data.get("message", {}).get("_id")
-        student = ta_msg_to_student_session.get(msg_id)
-        if student:
-            # remember that *this* TA session is now waiting for free-text
-            conversation_history[session_id]["awaiting_ta_response"] = f"session_{student}_twips_research"
-            return jsonify({
-                "text": "Please type your response to the student.",
-                "session_id": session_id
-            })
-    
-    target = conversation_history[session_id].pop("awaiting_ta_response", None)
-    if target:
-        forward_message_to_student(message, session_id, target)
-        return jsonify({
-            "text": "✅ Your response has been forwarded to the student.",
-            "session_id": session_id
-        })
-
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
         conversation_history[session_id].pop("last_followup_question", None)
@@ -747,6 +727,17 @@ def query():
     else:
         msg_id = None
 
+    # TA “Respond to Student” button clicked
+    if message.lower() == "respond":
+        msg_id = data.get("message", {}).get("_id")
+        student = ta_msg_to_student_session.get(msg_id)
+        student_session_id = f"session_{student}_twips_research" if student else None
+
+        if student:
+            # remember that *this* TA session is now waiting for free-text
+            conversation_history[student_session_id]["awaiting_ta_response"] = True
+            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
+        
     # ----------------------------
     # End of TA Question Workflow
     # ----------------------------
