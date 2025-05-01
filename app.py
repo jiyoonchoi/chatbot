@@ -508,45 +508,37 @@ def query():
         pdf_ready.pop(session_id, None)
 
     # TA “Respond to Student” button clicked
-        # TA “Respond to Student” button clicked
     if message.lower() == "respond":
         print("DEBUG: ===== RESPOND BUTTON CLICKED =====")
         print("DEBUG: full payload:", data)
 
-        # 1) grab the Rocket.Chat message object if there is one
-        msg_obj = data.get("message")
-        print("DEBUG: data.get('message') ->", msg_obj)
-        if not msg_obj:
-            print("DEBUG: no 'message' field in payload, ignoring button click")
-            return jsonify({"status": "ignored"})
-
-        # 2) get the _id
-        msg_id = msg_obj.get("_id")
-        print(f"DEBUG: extracted msg_id = {msg_id!r}")
+        # 1) pull Rocket.Chat’s message_id
+        msg_id = data.get("message_id")
+        print(f"DEBUG: extracted message_id -> {msg_id!r}")
         if not msg_id:
-            print("DEBUG: msg object had no '_id', ignoring")
+            print("DEBUG: no 'message_id' in payload → ignoring")
             return jsonify({"status": "ignored"})
 
-        # 3) look up which student session is mapped to that TA‐DM
+        # 2) look up which student that maps to
         print("DEBUG: current ta_msg_to_student_session map:", ta_msg_to_student_session)
         student_username = ta_msg_to_student_session.get(msg_id)
         print(f"DEBUG: ta_msg_to_student_session[{msg_id!r}] -> {student_username!r}")
         if not student_username:
-            print(f"DEBUG: no student_username found for msg_id {msg_id!r}, ignoring")
+            print(f"DEBUG: no mapping for message_id {msg_id!r} → ignoring")
             return jsonify({"status": "ignored"})
 
-        # 4) build the student’s session_id and ensure it’s tracked
+        # 3) build the student’s session and ensure we have a bucket for them
         student_session_id = f"session_{student_username}_twips_research"
         print(f"DEBUG: derived student_session_id = {student_session_id}")
         conversation_history.setdefault(student_session_id, {
             "messages": [], "question_flow": None, "awaiting_ta_response": False
         })
 
-        # 5) set the awaiting‐response flag on the student’s conversation
+        # 4) set the “awaiting TA response” flag on *that* student’s session
         conversation_history[student_session_id]["awaiting_ta_response"] = True
         print(f"DEBUG: set conversation_history[{student_session_id}]['awaiting_ta_response'] = True")
 
-        # 6) reply to the TA (still in the TA’s session) to prompt them for their free text
+        # 5) prompt *this* TA (your session_id) to type their answer
         print("DEBUG: prompting TA to type their response to the student")
         return jsonify({
             "text": "Please type your response to the student.",
