@@ -96,6 +96,7 @@ def classify_query(message, session_id):
               f"User Message: \"{message}\"")
     
     classification = generate_response("", prompt, session_id).lower().strip()
+    print(f"DEBUG: Classification: ", classification)
     
     if "greeting" in classification:
         return "greeting"
