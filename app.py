@@ -886,7 +886,7 @@ def query():
             #         session_id
             #     )
 
-            if specificity == "general":
+            if specificity == "asking_for_details":
                 print("DEBUG: Generating Elusive response about Paper...")
                 answer = generate_response(
                     "", 
