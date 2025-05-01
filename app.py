@@ -729,6 +729,7 @@ def query():
         msg_id = None
 
     if message == "respond":
+            student_session_id = f"session_{student_username}_twips_research"
             # Process TA response prompt. For example, set flag and prompt for typed response.
             print(data.get("text"))
             conversation_history[student_session_id]["awaiting_ta_response"] = True
