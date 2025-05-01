@@ -130,7 +130,7 @@ def generate_followup(session_id, override_last_bot=None):
     # graceful fallback
     if not last_bot_message:
         return ("I need a little context first — ask me something about "
-                "the paper, then press **Generate Follow-up**! 😊")
+                "the paper, then press **Get a Follow-up Question**! 😊")
 
     prompt = (
         f"You are acting as a TA chatbot helping a student think critically about a research paper.\n\n"
@@ -167,7 +167,7 @@ def show_buttons(text, session_id, summary_button=False, followup_button=False):
         attachments.append({
             "actions": [{
                 "type": "button",
-                "text": "🎲 Generate Follow-up",
+                "text": "🎲 Get a Follow-up Question",
                 "msg": f"__FOLLOWUP__| {encoded}",
                 "msg_in_chat_window": True,
                 "msg_processing_type": "sendMessage"
