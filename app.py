@@ -507,35 +507,6 @@ def query():
     if data.get("bot") or not message:
         return jsonify({"status": "ignored"})
 
-    # ────────────────────────────────
-    # TA “Respond” button clicked
-    # ────────────────────────────────
-    if message.lower() == "respond":
-        print("DEBUG: Respond button clicked")
-        # the button payload carries the original TA-DM message id
-        msg_id = data.get("message", {}).get("_id")
-        student_sess = ta_msg_to_student_session.get(msg_id)
-        if student_sess:
-            # mark that *this* TA session is now awaiting a free-text reply
-            conversation_history[session_id]["awaiting_ta_response"] = student_sess
-            print(f"DEBUG: Session {session_id} will forward next message to {student_sess}")
-            return jsonify({
-                "text": "Please type your response to the student.",
-                "session_id": session_id
-            })
-        
-    # ───────────────────────────────────────
-    # TA’s free-text reply → forward to student
-    # ───────────────────────────────────────
-    target = conversation_history[session_id].pop("awaiting_ta_response", None)
-    if target:
-        print(f"DEBUG: Forwarding TA reply from {session_id} to student {target}: {message}")
-        forward_message_to_student(message, session_id, target)
-        return jsonify({
-            "text": "✅ Your response has been forwarded to the student.",
-            "session_id": session_id
-        })
-
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
         conversation_history[session_id].pop("last_followup_question", None)
@@ -756,6 +727,14 @@ def query():
             return jsonify({"text": response, "session_id": session_id})
     else:
         msg_id = None
+
+    if message == "respond":
+            # Process TA response prompt. For example, set flag and prompt for typed response.
+            print(data.get("text"))
+            conversation_history[student_session_id]["awaiting_ta_response"] = True
+            print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
+
+            return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
    
     # ----------------------------
     # End of TA Question Workflow
