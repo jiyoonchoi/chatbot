@@ -508,33 +508,15 @@ def query():
         pdf_ready.pop(session_id, None)
 
     # TA “Respond to Student” button clicked
-    if message.lower() == "respond":
-        # 1) safely fetch the original TA-DM’s _id
-        msg_id = data.get("message", {}).get("_id")
-        if not msg_id:
-            # no valid message context, ignore or log
-            return jsonify({"status": "ignored"})
-
-        # 2) look up which student session it maps to
-        student_username = ta_msg_to_student_session.get(msg_id)
-        if not student_username:
-            return jsonify({"status": "ignored"})
-
+    if message == "respond":
+        # Process TA response prompt. For example, set flag and prompt for typed response.
+        msg_id = next(reversed(ta_msg_to_student_session))
+        student_username = ta_msg_to_student_session[msg_id]
         student_session_id = f"session_{student_username}_twips_research"
-
-        # 3) make sure the student bucket exists
-        conversation_history.setdefault(student_session_id, {
-            "messages": [], "question_flow": None, "awaiting_ta_response": False
-        })
-
-        # 4) set the flag on the *student’s* session
         conversation_history[student_session_id]["awaiting_ta_response"] = True
+        print(f"DEBUG: Session {student_session_id} is now awaiting TA response from {user}")
 
-        # 5) prompt the TA (stays in TA’s session)
-        return jsonify({
-            "text": "Please type your response to the student.",
-            "session_id": session_id
-        })
+        return jsonify({"text": "Please type your response to the student.", "session_id": student_session_id})
 
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
