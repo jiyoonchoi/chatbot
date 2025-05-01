@@ -492,6 +492,9 @@ def query():
 
     session_id = data.get("session_id") or get_session_id(data)
 
+    if data.get("bot") or not message:
+        return jsonify({"status": "ignored"})
+
     # Initialize conversation state if new session
     if session_id not in conversation_history:
         conversation_history[session_id] = {
@@ -503,17 +506,26 @@ def query():
         summary_cache.pop(session_id, None)
         processed_pdf.pop(session_id, None)
         pdf_ready.pop(session_id, None)
+
+    # TA “Respond to Student” button clicked
+    if message.lower() == "respond":
+        msg_id = data.get("message", {}).get("_id")
+        student = ta_msg_to_student_session.get(msg_id)
+        if student:
+            # remember that *this* TA session is now waiting for free-text
+            conversation_history[session_id]["awaiting_ta_response"] = f"session_{student}_twips_research"
+            return jsonify({
+                "text": "Please type your response to the student.",
+                "session_id": session_id
+            })
     
     target = conversation_history[session_id].pop("awaiting_ta_response", None)
     if target:
         forward_message_to_student(message, session_id, target)
         return jsonify({
-        "text": "✅ Your response has been forwarded to the student.",
-        "session_id": session_id
+            "text": "✅ Your response has been forwarded to the student.",
+            "session_id": session_id
         })
-
-    if data.get("bot") or not message:
-        return jsonify({"status": "ignored"})
 
     if message.lower() == "skip_followup":
         conversation_history[session_id]["awaiting_followup_response"] = False
@@ -525,22 +537,6 @@ def query():
     # ----------------------------
     # TA Question Workflow
     # ----------------------------
-
-    # TA “Respond to Student” button clicked
-    if message.lower() == "respond":
-        msg_id = data.get("message", {}).get("_id")
-        student_username = ta_msg_to_student_session.get(msg_id)
-        if student_username:
-            student_session_id = f"session_{student_username}_twips_research"
-
-            # mark that *this* TA session is now expecting a free-text reply
-            conversation_history[session_id]["awaiting_ta_response"] = student_session_id
-
-            return jsonify({
-                "text": "Please type your response to the student.",
-                "session_id": session_id
-            })
-
     if message == "ask_TA": 
         conversation_history[session_id]["awaiting_ta_question"] = False
         conversation_history[session_id].pop("student_question", None)
