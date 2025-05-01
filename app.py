@@ -67,8 +67,8 @@ def generate_response(system, prompt, session_id):
         system = ("You are a TA chatbot for CS-150. Answer only based on the uploaded paper. "
                   "Keep answers short, encourage users to check sections, and avoid creating your own questions.")
     response = generate(model='4o-mini', system=system, query=prompt, session_id=session_id, temperature=0.0,
-                        lastk=5, rag_usage=True, rag_threshold=0.2, rag_k=8)
-                        #  lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
+                        # lastk=5, rag_usage=True, rag_threshold=0.2, rag_k=8)
+                         lastk=5, rag_usage=True, rag_threshold=0.1, rag_k=5)
 
     if isinstance(response, dict):
         return response.get("response", "").strip()
@@ -170,7 +170,7 @@ def show_buttons(text, session_id, summary_button=False, followup_button=False):
             "actions": [{
                 "type": "button",
                 "text": "🎲 Get a Follow-up Question",
-                "msg": f"__FOLLOWUP__| {encoded}",
+                "msg": f"__FOLLOWUP__ | {encoded}",
                 "msg_in_chat_window": True,
                 "msg_processing_type": "sendMessage"
             }]
